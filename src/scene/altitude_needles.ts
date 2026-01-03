@@ -27,7 +27,8 @@ export class AltitudeNeedleLayer {
 
   constructor(scene: THREE.Scene, capacity: number) {
     // Cylinder is stable on mobile vs 1px line; base height=1 so we can scale per instance.
-    const geom = new THREE.CylinderGeometry(180, 180, 1, 10, 1, true);
+    // True-scale-ish needle: ~1m diameter at base (visual aid, but not overpowering).
+    const geom = new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, true);
     // Cylinder axis is +Y by default: we will align +Y to the local surface normal (radial).
 
     const mat = new THREE.MeshBasicMaterial({
@@ -88,7 +89,7 @@ export class AltitudeNeedleLayer {
       // Thickness scales gently with altitude (avoid alpha shimmer).
       const alt = Math.max(0, a.positionEnuM.y);
       const t = THREE.MathUtils.clamp(alt / 12000, 0, 1);
-      const thicknessScale = THREE.MathUtils.lerp(0.85, 1.85, t);
+      const thicknessScale = THREE.MathUtils.lerp(1.0, 2.0, t);
       this.tmp.scale.set(thicknessScale, length, thicknessScale);
 
       this.tmp.mat.compose(this.tmp.pos, this.tmp.quat, this.tmp.scale);

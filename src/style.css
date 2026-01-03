@@ -114,6 +114,25 @@ body {
   color: rgba(248, 113, 113, 0.95);
 }
 
+.data_status {
+  position: absolute;
+  top: 82px;
+  left: 12px;
+  margin-top: 0;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+.data_status[data-state="active"] {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.data_status[data-state="error"] {
+  color: rgba(248, 113, 113, 0.95);
+}
+
 .hud_text {
   font-size: 12px;
   letter-spacing: 0.04em;

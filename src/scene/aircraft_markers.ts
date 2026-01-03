@@ -36,7 +36,9 @@ export class AircraftMarkerLayer {
 
     // Marker shape: forward-pointing cone so heading is visible.
     // Local forward: +Z (after rotateX), local up: +Y.
-    const g = new THREE.ConeGeometry(1600, 5200, 8);
+    // NOTE: tuned for OpenSky density; keep visually readable without dominating the scene.
+    // True-scale marker: ~60m length, ~36m wingspan-ish silhouette using a cone proxy.
+    const g = new THREE.ConeGeometry(18, 60, 8);
     g.rotateX(Math.PI / 2); // cone axis +Y -> +Z
     this.geom = g;
 

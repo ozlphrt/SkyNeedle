@@ -1,6 +1,11 @@
 import * as THREE from "three";
 import type { AircraftSample } from "../data/mock_provider";
-import { AIRCRAFT_MARKER_LIFT_M, GLOBE_CENTER_WORLD, GLOBE_RADIUS_M, GLOBE_TOP_DIR_WORLD } from "./globe_params";
+import {
+  AIRCRAFT_MARKER_LIFT_M,
+  GLOBE_CENTER_WORLD,
+  GLOBE_RADIUS_M,
+  GLOBE_TOP_DIR_WORLD
+} from "./globe_params";
 
 const M_TO_FT = 3.280839895;
 const MI_TO_M = 1609.344;
@@ -15,6 +20,7 @@ export class LabelLayer {
   private readonly group = new THREE.Group();
   private readonly byId = new Map<string, LabelState>();
   private selectedId: string | null = null;
+  private readonly tmpRadial = new THREE.Vector3();
 
   // Radius-based visibility (ENU horizontal distance).
   // Show within 25mi, fade out over next 10mi, hidden beyond 35mi.
@@ -42,9 +48,10 @@ export class LabelLayer {
 
       // Position: follow aircraft marker (rendered on globe surface); offset slightly along local radial.
       // Rendering-only: derive surface normal from ENU horizontal direction (same as marker projection).
-      const radial = enuHorizontalToSurfaceNormal(a.positionEnuM.x, a.positionEnuM.z);
+      enuHorizontalToSurfaceNormalInto(a.positionEnuM.x, a.positionEnuM.z, this.tmpRadial);
       const r = GLOBE_RADIUS_M + a.positionEnuM.y + AIRCRAFT_MARKER_LIFT_M;
-      st.sprite.position.copy(GLOBE_CENTER_WORLD).addScaledVector(radial, r + 2200);
+      // Keep label close to aircraft, sized to not overwhelm (~tens of meters).
+      st.sprite.position.copy(GLOBE_CENTER_WORLD).addScaledVector(this.tmpRadial, r + 60);
 
       // Target opacity from ENU horizontal radius.
       const d = Math.hypot(a.positionEnuM.x, a.positionEnuM.z);
@@ -56,7 +63,8 @@ export class LabelLayer {
 
       // Text update (cheap: regenerate only if changed enough).
       const altFt = Math.round(a.positionEnuM.y * M_TO_FT);
-      const text = `${a.id}\n${altFt}ft`;
+      const top = a.callsign || a.id;
+      const text = `${top}\n${altFt}ft`;
       if ((st.sprite.userData as any).text !== text) {
         (st.sprite.userData as any).text = text;
         this.updateLabelTexture(st, text);
@@ -85,7 +93,7 @@ export class LabelLayer {
     sprite.userData = { aircraftId: a.id, text: "" };
 
     const st: LabelState = { sprite, material, opacity: 0 };
-    this.updateLabelTexture(st, `${a.id}`);
+    this.updateLabelTexture(st, `${a.callsign || a.id}`);
 
     return st;
   }
@@ -103,20 +111,27 @@ export class LabelLayer {
   }
 }
 
-function enuHorizontalToSurfaceNormal(xEast: number, zNorth: number): THREE.Vector3 {
+const EAST_AXIS = new THREE.Vector3(1, 0, 0);
+const NORTH_AXIS = new THREE.Vector3(0, 0, 1);
+
+function enuHorizontalToSurfaceNormalInto(
+  xEast: number,
+  zNorth: number,
+  out: THREE.Vector3
+): void {
   const d = Math.hypot(xEast, zNorth);
   const theta = d / GLOBE_RADIUS_M;
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
 
   const n = GLOBE_TOP_DIR_WORLD;
-  const u = new THREE.Vector3(1, 0, 0); // east
-  const v = new THREE.Vector3(0, 0, 1); // north
+  const u = EAST_AXIS; // east
+  const v = NORTH_AXIS; // north
 
   const dir2x = d > 1e-3 ? xEast / d : 0;
   const dir2z = d > 1e-3 ? zNorth / d : 0;
 
-  return new THREE.Vector3()
+  out
     .copy(n)
     .multiplyScalar(cosT)
     .addScaledVector(u, sinT * dir2x)
@@ -125,8 +140,8 @@ function enuHorizontalToSurfaceNormal(xEast: number, zNorth: number): THREE.Vect
 }
 
 function renderLabelCanvas(text: string): { canvas: HTMLCanvasElement; scale: THREE.Vector3 } {
-  const fontTop = "bold 22px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
-  const fontBottom = "bold 18px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+  const fontTop = "bold 18px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
+  const fontBottom = "bold 14px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif";
   const padX = 14;
   const padY = 8;
 
@@ -183,7 +198,8 @@ function renderLabelCanvas(text: string): { canvas: HTMLCanvasElement; scale: TH
   }
 
   // World scale: tuned for map view.
-  const scale = new THREE.Vector3(w * 120, h * 120, 1);
+  // True-scale: keep labels in the ~20–120m range (depends on string length).
+  const scale = new THREE.Vector3(w * 0.7, h * 0.7, 1);
   return { canvas, scale };
 }
 

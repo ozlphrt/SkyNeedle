@@ -10,6 +10,7 @@ const MI_TO_M = 1609.344;
 
 export type AircraftSample = {
   id: string;
+  callsign: string;
   positionEnuM: THREE.Vector3;
   headingDeg: number;
 };
@@ -70,7 +71,10 @@ function buildSeeds(count: number, radiusM: number): AircraftSeed[] {
     const u4 = hash01(i * 5 + 4);
 
     // Uniform in disk: r = sqrt(u) * R, theta = 2πv
-    const r = Math.sqrt(u1) * radiusM;
+    // Ensure a few aircraft are near the airport so "tower" view (3mi standoff) can show motion/trails.
+    const localRadiusM = 3 * MI_TO_M;
+    const rMax = i < 4 ? Math.min(radiusM, localRadiusM) : radiusM;
+    const r = Math.sqrt(u1) * rMax;
     const theta = 2 * Math.PI * u2;
     const xEast = r * Math.cos(theta);
     const zNorth = r * Math.sin(theta);
@@ -112,6 +116,7 @@ function sampleAt(seed: AircraftSeed[], tSec: number): AircraftSample[] {
     pos.y = s.altM;
     return {
       id: s.id,
+      callsign: s.id,
       positionEnuM: pos,
       headingDeg: headingDegFromVelocity(s.v.x, s.v.z)
     };

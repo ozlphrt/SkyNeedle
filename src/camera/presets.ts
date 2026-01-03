@@ -9,10 +9,11 @@ export type CameraPreset = {
 
 export function getTowerPreset(): CameraPreset {
   // ENU origin is the active airport (default JFK). For now, origin == (0,0,0).
-  // Place camera south of origin looking north; high enough to see 50mi rings.
+  // Default altitude requested: 10,000 ft ≈ 3048 m.
   return {
     name: "tower",
-    positionWorld: new THREE.Vector3(0, 120_000, -120_000),
+    // 3 miles ≈ 4,828 m south of the airport, looking north toward origin.
+    positionWorld: new THREE.Vector3(0, 3048, -4_828),
     targetWorld: new THREE.Vector3(0, 0, 0),
     fovDeg: 55
   };
@@ -23,7 +24,8 @@ export function getOrbitPreset(params: {
   // Fixed offset in world space (simple + stable). OrbitControls will handle user orbiting.
   offsetWorld?: THREE.Vector3;
 }): CameraPreset {
-  const offset = params.offsetWorld ?? new THREE.Vector3(0, 18_000, -32_000);
+  // True-scale: keep orbit offset in hundreds of meters (close enough to read aircraft/label).
+  const offset = params.offsetWorld ?? new THREE.Vector3(0, 450, -900);
   return {
     name: "orbit",
     positionWorld: params.targetWorld.clone().add(offset),

@@ -28,6 +28,7 @@ This file exists to prevent drift. Cursor AI must treat it as **authoritative**.
 - Globe is a **visual background**, not the truth frame.
 - For visual coherence, place the globe so the ENU origin appears on the **globe surface**
   (rings should not look like they are inside the Earth).
+ - Globe radius: **true Earth mean radius** \(R = 6,371,000m\). ENU units remain meters.
 
 ### Distance rings (rendering)
 - Ring distances are defined in **ENU** (meters/miles) around the active airport origin.
@@ -44,6 +45,7 @@ This file exists to prevent drift. Cursor AI must treat it as **authoritative**.
 ### Marker rendering (visual-only)
 - Marker-only mode may be **surface-projected** onto the visual globe for coherence with curved rings.
 - Truth positions remain ENU; projection is **rendering-only**.
+ - Marker scale intent: keep cone proxy at approximately **real aircraft size** (tens of meters), not km-scale.
 
 ### Altitude needles (rendering)
 - Needles are visualized as vertical/radial “needles” from aircraft toward the ground.

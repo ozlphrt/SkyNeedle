@@ -23,7 +23,8 @@ function createSurfaceRingOverlay(): THREE.Mesh {
   ];
 
   // Angular half-width for ring band (radians): thickness_m / R.
-  const thicknessM = 350;
+  // True-scale: render as a thin painted band (still a visual aid, but not hundreds of meters thick).
+  const thicknessM = 60;
   const halfWidth = (thicknessM / GLOBE_RADIUS_M) * 0.5;
 
   const material = new THREE.ShaderMaterial({
@@ -36,7 +37,7 @@ function createSurfaceRingOverlay(): THREE.Mesh {
       uThetas: { value: thetas },
       uHalfWidth: { value: halfWidth },
       uColor: { value: new THREE.Color(0x2dd4bf) },
-      uOpacity: { value: 0.55 }
+      uOpacity: { value: 0.85 }
     },
     vertexShader: `
       varying vec3 vWorldPos;

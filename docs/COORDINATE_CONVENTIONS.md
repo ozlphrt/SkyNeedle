@@ -30,7 +30,7 @@ The globe is a **visual background**, not the coordinate truth.
   - To avoid the rings looking like they’re inside the globe, place the globe so that the
     ENU origin lies on the **globe surface**, not at the globe center.
   - Minimal placement (visual-only, no geospatial registration):
-    - Let globe radius be \(R\) (meters).
+    - Let globe radius be \(R\) (meters). **Default: true Earth mean radius** \(R = 6,371,000m\).
     - Place globe center at \((0, -R, 0)\) so the “top” of the globe touches the origin.
 - Rotate globe to align any **visual north cue** with +Z **only if** the globe texture/grid implies a north;
   otherwise treat the globe as decorative.

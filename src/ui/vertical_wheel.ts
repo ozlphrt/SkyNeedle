@@ -195,7 +195,7 @@ export class VerticalWheel {
         continue;
       }
       const a = this.ordered[idx];
-      el.textContent = a.id;
+      el.textContent = a.callsign || a.id;
       el.style.opacity = idx === previewIndex ? "1" : "0.55";
       el.classList.toggle("is_active", idx === previewIndex);
     }

@@ -7,11 +7,11 @@ export function addGlobeBackground(scene: THREE.Scene) {
   scene.add(globeRoot);
 
   // Minimal early lighting (no shadows; avoid shimmer).
-  const ambient = new THREE.AmbientLight(0xffffff, 0.22);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.35);
   ambient.renderOrder = -9;
   scene.add(ambient);
 
-  const moon = new THREE.DirectionalLight(0xffffff, 0.55);
+  const moon = new THREE.DirectionalLight(0xffffff, 0.75);
   moon.position.set(1, 2, 1);
   moon.renderOrder = -9;
   scene.add(moon);
@@ -24,12 +24,11 @@ function createGlobeRoot(): THREE.Group {
 
   const map = createProceduralEarthTexture(768, 384);
 
-  const material = new THREE.MeshStandardMaterial({
+  // Use an unlit material so the globe remains readable at true scale without having to
+  // over-crank scene lighting (the globe is a visual reference, not a physically-lit asset).
+  const material = new THREE.MeshBasicMaterial({
     map,
-    roughness: 1.0,
-    metalness: 0.0,
-    emissive: new THREE.Color(0x05070a),
-    emissiveIntensity: 0.18
+    color: 0xffffff
   });
 
   const globeMesh = new THREE.Mesh(geometry, material);
@@ -38,8 +37,13 @@ function createGlobeRoot(): THREE.Group {
   const clouds = createCloudLayer(geometry);
   clouds.renderOrder = -9;
 
+  // Subtle atmosphere rim so the Earth reads at true scale (otherwise curvature is extremely slight
+  // at our tower camera distances and the dark texture can look like empty space).
+  const atmosphere = createAtmosphereLayer(geometry);
+  atmosphere.renderOrder = -8;
+
   const root = new THREE.Group();
-  root.add(globeMesh, clouds);
+  root.add(globeMesh, clouds, atmosphere);
 
   // Visual-only globe: keep centered, no geospatial registration.
   // NOTE: ENU (+Z North) is defined by the world overlays (arrow/axes), not by the globe texture.
@@ -51,6 +55,21 @@ function createGlobeRoot(): THREE.Group {
   return root;
 }
 
+function createAtmosphereLayer(sharedGeometry: THREE.BufferGeometry): THREE.Mesh {
+  const material = new THREE.MeshBasicMaterial({
+    color: 0x60a5fa,
+    transparent: true,
+    opacity: 0.06,
+    depthWrite: false,
+    side: THREE.BackSide,
+    blending: THREE.AdditiveBlending
+  });
+
+  const mesh = new THREE.Mesh(sharedGeometry, material);
+  mesh.scale.setScalar(1.02);
+  return mesh;
+}
+
 function createProceduralEarthTexture(w: number, h: number): THREE.CanvasTexture {
   const canvas = document.createElement("canvas");
   canvas.width = w;
@@ -60,9 +79,10 @@ function createProceduralEarthTexture(w: number, h: number): THREE.CanvasTexture
 
   // Base: dark ocean with a slight latitude gradient (helps it read as "Earth").
   const oceanGrad = ctx.createLinearGradient(0, 0, 0, h);
-  oceanGrad.addColorStop(0.0, "#02060b");
-  oceanGrad.addColorStop(0.5, "#041018");
-  oceanGrad.addColorStop(1.0, "#02060b");
+  // Slightly brighter than the background clear color so the globe is visible at true scale.
+  oceanGrad.addColorStop(0.0, "#061018");
+  oceanGrad.addColorStop(0.5, "#0a2030");
+  oceanGrad.addColorStop(1.0, "#061018");
   ctx.fillStyle = oceanGrad;
   ctx.fillRect(0, 0, w, h);
 
@@ -110,9 +130,9 @@ function createProceduralEarthTexture(w: number, h: number): THREE.CanvasTexture
       const i = (y * w + x) * 4;
       // Latitude-based land tint (greens near equator, browner toward subtropics).
       const equator = 1 - Math.abs(lat) / (Math.PI / 2); // 0..1
-      const green = 10 + Math.round(28 * equator);
-      const red = 10 + Math.round(18 * (1 - equator * 0.7));
-      const blue = 10 + Math.round(10 * equator * 0.6);
+      const green = 28 + Math.round(64 * equator);
+      const red = 22 + Math.round(44 * (1 - equator * 0.7));
+      const blue = 18 + Math.round(26 * equator * 0.6);
       d[i + 0] = Math.min(255, d[i + 0] + red);
       d[i + 1] = Math.min(255, d[i + 1] + green);
       d[i + 2] = Math.min(255, d[i + 2] + blue);

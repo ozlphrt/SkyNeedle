@@ -10,9 +10,9 @@ export function addAirportStub(scene: THREE.Scene) {
 
   // Runway (simple rectangle), centered at ENU origin.
   const runway = createRunway({
-    // Exaggerated for visibility at current tower/map camera distances.
-    lengthM: 20_000,
-    widthM: 900,
+    // Plausible runway sizing (meters). Keep subtle; OSM should replace this on success.
+    lengthM: 4000,
+    widthM: 90,
     headingDeg: 44,
     color: 0x14b8a6 // muted teal (avoid neon)
   });
@@ -20,8 +20,8 @@ export function addAirportStub(scene: THREE.Scene) {
 
   // Runway centerline stripe (high contrast).
   const centerline = createRunway({
-    lengthM: 19_200,
-    widthM: 120,
+    lengthM: 3950,
+    widthM: 8,
     headingDeg: 44,
     color: 0xc7d2fe // soft off-white (never pure white)
   });
@@ -30,13 +30,13 @@ export function addAirportStub(scene: THREE.Scene) {
 
   // Taxiway strips (simple rectangles), offset from runway.
   const taxiA = createRunway({
-    lengthM: 6000,
-    widthM: 420,
+    lengthM: 1200,
+    widthM: 30,
     headingDeg: 44,
     color: 0x34d399 // muted green
   });
-  taxiA.position.x += 220;
-  taxiA.position.z -= 140;
+  taxiA.position.x += 140;
+  taxiA.position.z -= 90;
   taxiA.material = new THREE.MeshBasicMaterial({
     color: 0x34d399,
     transparent: true,
@@ -49,19 +49,20 @@ export function addAirportStub(scene: THREE.Scene) {
   group.add(taxiA);
 
   const taxiB = createRunway({
-    lengthM: 4500,
-    widthM: 360,
+    lengthM: 900,
+    widthM: 26,
     headingDeg: 134,
     color: 0x34d399
   });
-  taxiB.position.x -= 260;
-  taxiB.position.z += 180;
+  taxiB.position.x -= 160;
+  taxiB.position.z += 110;
   (taxiB.material as THREE.MeshBasicMaterial).opacity = 0.22;
   (taxiB.material as THREE.MeshBasicMaterial).depthTest = false;
   taxiB.renderOrder = 90;
   group.add(taxiB);
 
   scene.add(group);
+  return group;
 }
 
 function createRunway(params: {
