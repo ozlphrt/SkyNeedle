@@ -1,0 +1,258 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: #000;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+.screen {
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+#three-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.title {
+  color: #fff;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.35;
+}
+
+.hud_button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  pointer-events: auto;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+
+.tower_btn {
+  right: auto;
+  left: 12px;
+  top: 42px;
+}
+
+.hud_button:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+}
+
+.hud_button:active {
+  transform: translateY(1px);
+}
+
+.search {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.search_input {
+  width: 220px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  outline: none;
+  font-size: 13px;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.search_input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.search_status {
+  min-height: 16px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.search_status[data-state="active"] {
+  color: rgba(96, 165, 250, 0.9);
+}
+
+.search_status[data-state="error"] {
+  color: rgba(248, 113, 113, 0.95);
+}
+
+.hud_text {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  padding: 8px 10px;
+  backdrop-filter: blur(10px);
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wheel_host {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 120px;
+  height: 160px;
+  pointer-events: auto;
+  flex: 0 0 auto;
+  touch-action: none;
+  transition: width 160ms ease, height 160ms ease, border-radius 160ms ease;
+}
+
+.wheel_host.is_collapsed {
+  width: 44px;
+  height: 44px;
+}
+
+.wheel_host.is_collapsed .wheel {
+  border-radius: 999px;
+}
+
+.wheel_host.is_collapsed .wheel_list,
+.wheel_host.is_collapsed .wheel_mask,
+.wheel_host.is_collapsed .wheel_focus_line {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.wheel_host.is_collapsed .wheel::before {
+  content: "✈";
+  font-size: 18px;
+  letter-spacing: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 520px) {
+  .wheel_host {
+    width: 110px;
+    height: 150px;
+  }
+
+  .wheel_host.is_collapsed {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.wheel {
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  position: relative;
+}
+
+.wheel::before {
+  content: "WHEEL";
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.wheel_mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.95),
+    rgba(0, 0, 0, 0.1) 18%,
+    rgba(0, 0, 0, 0.0) 50%,
+    rgba(0, 0, 0, 0.1) 82%,
+    rgba(0, 0, 0, 0.95)
+  );
+  pointer-events: none;
+}
+
+.wheel_list {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  will-change: transform;
+}
+
+.wheel_item {
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.wheel_item.is_active {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.wheel_focus_line {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 28px;
+  transform: translateY(-50%);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+
