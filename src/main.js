@@ -7,7 +7,7 @@ import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
 
 // Configuration
-const CESIUM_ION_TOKEN = 'YOUR_CESIUM_ION_TOKEN'; // TODO: Replace with actual token
+const CESIUM_ION_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3N2VmNjQ5YS00MzNiLTRjODUtYTYwMS1hZjIwOGM3YWFkMDUiLCJpZCI6MzgwMzQwLCJpYXQiOjE3Njg3NDA5ODB9.ILdx02CrRUguqA-msX6n5l9-NRFuF6oHPGtqlgabJB4';
 const OPENSKY_USERNAME = ''; // Optional: Add OpenSky credentials
 const OPENSKY_PASSWORD = ''; // Optional: Add OpenSky credentials
 
