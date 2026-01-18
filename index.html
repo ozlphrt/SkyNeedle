@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SkyNeedle - 3D Flight Tracking with ATC-inspired interface">
+  <meta name="theme-color" content="#0a0e14">
+  
+  <title>SkyNeedle - 3D Flight Tracker</title>
+  
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.json">
+  
+  <!-- Preconnect to Cesium Ion -->
+  <link rel="preconnect" href="https://api.cesium.com">
+  
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Cesium Container -->
+    <div id="cesiumContainer"></div>
+    
+    <!-- UI Overlay -->
+    <div id="ui-overlay">
+      <!-- Header -->
+      <header class="app-header">
+        <h1 class="app-title">SKYNEEDLE</h1>
+        <div class="app-status">
+          <span class="status-indicator"></span>
+          <span class="status-text">INITIALIZING</span>
+        </div>
+      </header>
+      
+      <!-- Search Panel -->
+      <div id="searchPanel" class="panel search-panel">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="search-input" 
+          placeholder="SEARCH: CITY / AIRPORT / FLIGHT #"
+          autocomplete="off"
+        >
+        <div id="searchResults" class="search-results"></div>
+      </div>
+      
+      <!-- Aircraft Details Panel -->
+      <div id="aircraftDetails" class="panel details-panel hidden">
+        <div class="panel-header">
+          <h2 class="panel-title">AIRCRAFT DATA</h2>
+          <button class="close-btn" id="closeDetails">×</button>
+        </div>
+        <div class="panel-content">
+          <div class="data-row">
+            <span class="data-label">CALLSIGN:</span>
+            <span class="data-value" id="detailCallsign">—</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">ALTITUDE:</span>
+            <span class="data-value" id="detailAltitude">—</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">VELOCITY:</span>
+            <span class="data-value" id="detailVelocity">—</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">HEADING:</span>
+            <span class="data-value" id="detailHeading">—</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">ORIGIN:</span>
+            <span class="data-value" id="detailOrigin">—</span>
+          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="action-btn" id="trackAircraft">TRACK</button>
+          <button class="action-btn" id="followAircraft">FOLLOW</button>
+        </div>
+      </div>
+      
+      <!-- Camera Controls -->
+      <div id="cameraControls" class="panel camera-panel">
+        <button class="camera-btn" id="cameraOverview">OVERVIEW</button>
+        <button class="camera-btn" id="cameraTrack">TRACK</button>
+        <button class="camera-btn" id="cameraFollow">FOLLOW</button>
+      </div>
+      
+      <!-- Filter Panel -->
+      <div id="filterPanel" class="panel filter-panel">
+        <div class="filter-group">
+          <label class="filter-label">ALTITUDE RANGE</label>
+          <input type="range" id="altitudeMin" class="filter-slider" min="0" max="50000" value="0">
+          <input type="range" id="altitudeMax" class="filter-slider" min="0" max="50000" value="50000">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">
+            <input type="checkbox" id="showAirports" checked>
+            SHOW AIRPORTS
+          </label>
+          <label class="filter-label">
+            <input type="checkbox" id="showTraces" checked>
+            SHOW TRACES
+          </label>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+      <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">INITIALIZING SKYNEEDLE</p>
+        <p class="loading-subtext">LOADING 3D ENGINE...</p>
+      </div>
+    </div>
+  </div>
+  
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
