@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "server": "node server.js",
+    "dev:all": "start npm run server && npm run dev",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
@@ -19,11 +21,15 @@
   "author": "ozlphrt",
   "license": "MIT",
   "dependencies": {
-    "cesium": "^1.112.0"
+    "cesium": "^1.112.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
+    "gh-pages": "^6.1.1",
     "vite": "^5.0.11",
-    "vite-plugin-cesium": "^1.2.22",
-    "gh-pages": "^6.1.1"
+    "vite-plugin-cesium": "^1.2.22"
   }
 }

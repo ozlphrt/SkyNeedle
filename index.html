@@ -1,26 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="description" content="SkyNeedle - 3D Flight Tracking with ATC-inspired interface">
   <meta name="theme-color" content="#0a0e14">
-  
+
   <title>SkyNeedle - 3D Flight Tracker</title>
-  
+
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="manifest" href="/manifest.json">
-  
+
   <!-- Preconnect to Cesium Ion -->
   <link rel="preconnect" href="https://api.cesium.com">
-  
+
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
+
 <body>
   <div id="app">
     <!-- Cesium Container -->
     <div id="cesiumContainer"></div>
-    
+
     <!-- UI Overlay -->
     <div id="ui-overlay">
       <!-- Header -->
@@ -31,19 +33,14 @@
           <span class="status-text">INITIALIZING</span>
         </div>
       </header>
-      
+
       <!-- Search Panel -->
       <div id="searchPanel" class="panel search-panel">
-        <input 
-          type="text" 
-          id="searchInput" 
-          class="search-input" 
-          placeholder="SEARCH: CITY / AIRPORT / FLIGHT #"
-          autocomplete="off"
-        >
+        <input type="text" id="searchInput" class="search-input" placeholder="SEARCH: CITY / AIRPORT / FLIGHT #"
+          autocomplete="off">
         <div id="searchResults" class="search-results"></div>
       </div>
-      
+
       <!-- Aircraft Details Panel -->
       <div id="aircraftDetails" class="panel details-panel hidden">
         <div class="panel-header">
@@ -77,34 +74,39 @@
           <button class="action-btn" id="followAircraft">FOLLOW</button>
         </div>
       </div>
-      
+
       <!-- Camera Controls -->
       <div id="cameraControls" class="panel camera-panel">
         <button class="camera-btn" id="cameraOverview">OVERVIEW</button>
         <button class="camera-btn" id="cameraTrack">TRACK</button>
         <button class="camera-btn" id="cameraFollow">FOLLOW</button>
+        <button class="camera-btn" id="cameraCockpit">COCKPIT</button>
       </div>
-      
+
       <!-- Filter Panel -->
       <div id="filterPanel" class="panel filter-panel">
-        <div class="filter-group">
-          <label class="filter-label">ALTITUDE RANGE</label>
-          <input type="range" id="altitudeMin" class="filter-slider" min="0" max="50000" value="0">
-          <input type="range" id="altitudeMax" class="filter-slider" min="0" max="50000" value="50000">
+        <label class="filter-label">ALTITUDE RANGE</label>
+        <div class="range-slider-container">
+          <div class="slider-track"></div>
+          <input type="range" id="altitudeMin" class="dual-slider" min="0" max="50000" value="0">
+          <input type="range" id="altitudeMax" class="dual-slider" min="0" max="50000" value="50000">
         </div>
-        <div class="filter-group">
-          <label class="filter-label">
+
+        <div class="checkbox-group">
+          <label class="custom-checkbox">
             <input type="checkbox" id="showAirports" checked>
+            <span class="checkmark"></span>
             SHOW AIRPORTS
           </label>
-          <label class="filter-label">
+          <label class="custom-checkbox">
             <input type="checkbox" id="showTraces" checked>
+            <span class="checkmark"></span>
             SHOW TRACES
           </label>
         </div>
       </div>
     </div>
-    
+
     <!-- Loading Screen -->
     <div id="loadingScreen" class="loading-screen">
       <div class="loading-content">
@@ -114,7 +116,8 @@
       </div>
     </div>
   </div>
-  
+
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
