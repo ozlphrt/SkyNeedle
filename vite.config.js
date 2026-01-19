@@ -1,14 +1,19 @@
 import { defineConfig } from 'vite';
-import cesium from 'vite-plugin-cesium';
 
 export default defineConfig({
-  plugins: [cesium({
-    rebuildCesium: false
-  })],
-  base: '/SkyNeedle/',  // GitHub Pages serves dist/ at /SkyNeedle/ automatically
+  plugins: [],
+  base: '/SkyNeedle/',
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      external: ['cesium'],
+      output: {
+        globals: {
+          cesium: 'Cesium'
+        }
+      }
+    }
   },
   server: {
     port: 3000,
