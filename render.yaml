@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: skyneedle-api
+    runtime: node
+    env: node
+    repo: https://github.com/ozlphrt/SkyNeedle
+    branch: main
+    buildCommand: npm install
+    startCommand: npm run server
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENSKY_CLIENT_ID
+        sync: false
+      - key: OPENSKY_CLIENT_SECRET
+        sync: false
+    healthCheckPath: /health

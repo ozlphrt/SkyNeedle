@@ -229,9 +229,17 @@ async function fetchAircraftData(bounds = null) {
 
         console.log('Fetching aircraft for bounds:', bbox);
 
-        // Use relative path - Vite proxy will forward to localhost:3002
-        // This resolves CORS issues and handles authentication securely on the backend
-        const url = `/api/states/all?lamin=${bbox.lamin}&lomin=${bbox.lomin}&lamax=${bbox.lamax}&lomax=${bbox.lomax}`;
+        // Detect environment - use Render backend in production, local proxy in development
+        const isProduction = window.location.hostname === 'ozlphrt.github.io';
+        const API_BASE = isProduction
+            ? 'https://skyneedle-api.onrender.com'
+            : '';
+
+        // Use relative path in development (Vite proxy forwards to localhost:3002)
+        // Use absolute URL in production (points to Render backend)
+        const url = `${API_BASE}/api/states/all?lamin=${bbox.lamin}&lomin=${bbox.lomin}&lamax=${bbox.lamax}&lomax=${bbox.lomax}`;
+
+        console.log(`API Request: ${isProduction ? 'PRODUCTION' : 'DEVELOPMENT'} → ${url}`);
 
         // No need for client-side headers - the proxy handles authentication
         const response = await fetch(url);

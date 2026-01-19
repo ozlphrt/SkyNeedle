@@ -6,14 +6,7 @@ export default defineConfig({
   base: '/SkyNeedle/',
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          cesium: ['cesium']
-        }
-      }
-    }
+    sourcemap: true
   },
   server: {
     port: 3000,

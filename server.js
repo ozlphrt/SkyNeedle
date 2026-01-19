@@ -11,7 +11,25 @@ const app = express();
 const PORT = process.env.PORT || 3002;
 
 // Enable CORS for frontend requests
-app.use(cors());
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://ozlphrt.github.io'
+];
+
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            console.log(`[CORS] Blocked request from origin: ${origin}`);
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true
+}));
 
 // Token Management
 let tokenCache = {
