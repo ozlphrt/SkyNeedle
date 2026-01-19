@@ -2,8 +2,11 @@ import { defineConfig } from 'vite';
 import cesium from 'vite-plugin-cesium';
 
 export default defineConfig({
-  plugins: [cesium()],
-  base: '/SkyNeedle/',
+  plugins: [cesium({
+    // Ensure Cesium assets are copied to the correct output directory
+    rebuildCesium: false
+  })],
+  base: '/SkyNeedle/',  // GitHub Pages repository path
   build: {
     outDir: 'dist',
     sourcemap: true
