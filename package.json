@@ -1,13 +1,13 @@
 {
   "name": "skyneedle",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "3D Flight Tracking PWA with ATC-inspired interface",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "server": "node server.js",
     "dev:all": "start npm run server && npm run dev",
-    "build": "vite build",
+    "build": "vite build && node move-cesium.js",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
   },
