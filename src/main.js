@@ -47,7 +47,14 @@ const app = {
     },
     searchQuery: '', // Search query string
     trackedEntity: null,
-    followMode: 'NONE' // 'NONE', 'TRACK', 'FOLLOW', 'COCKPIT'
+    followMode: 'NONE', // 'NONE', 'TRACK', 'FOLLOW', 'COCKPIT'
+    // Debug mode for manual alignment
+    debugMode: false,
+    debugOffsets: {
+        x: 0.0,  // Left/Right (meters)
+        y: 0.0,  // Forward/Backward (meters)
+        z: 0.0   // Up/Down (meters)
+    }
 };
 
 /**
@@ -556,18 +563,16 @@ function updateAircraftDisplay(aircraftData) {
                 position: positionProperty,
                 orientation: new Cesium.VelocityOrientationProperty(positionProperty),
                 point: {
-                    pixelSize: 1, // Minimize
+                    pixelSize: 1,
                     color: Cesium.Color.RED.withAlpha(0.0),
                     outlineWidth: 0
                 },
+                // Trail on track entity (has proper SampledPositionProperty)
                 path: {
                     leadTime: 0,
                     trailTime: 300,
-                    width: 2,
-                    material: new Cesium.PolylineGlowMaterialProperty({
-                        glowPower: 0.2,
-                        color: Cesium.Color.fromCssColorString('#00d4ff')
-                    }),
+                    width: 12,
+                    material: Cesium.Color.YELLOW.withAlpha(0.4),
                     show: new Cesium.CallbackProperty(() => app.filters.showTraces, false)
                 }
             });
@@ -584,26 +589,59 @@ function updateAircraftDisplay(aircraftData) {
         // This is the MAIN entity the user clicks and sees.
         // It follows the Track Entity with an offset.
 
-        // OFFSETS (Adjusted based on feedback)
-        // Coordinate System (Cesium Entity Local Frame after glTF conversion):
-        // X = Right/Left (negative = left)
-        // Y = Forward/Back (positive = forward)  
-        // Z = Up/Down
-        const OFFSET_LEFT = -70.0;  // Negative X to move left
-        const OFFSET_FORWARD = 50.0; // Positive Y to move forward
+        // OFFSETS REMOVED - Trail should align with aircraft center
+        // The visual model and trail now share the same position (no offset)
+        // This ensures the trail emanates from the aircraft's actual position
+        // FIXED OFFSETS (Aligned via Manual Debug Mode)
+        // These are now applied to the MODEL NODES to scale correctly with minimumPixelSize
+        const MODEL_OFFSET_X = 55.40;
+        const MODEL_OFFSET_Y = -114.00;
+        const MODEL_OFFSET_Z = -10.00;
 
         if (!visualEntity) {
+            // Create Translation Callback for NodeTransformationProperty
+            const translationCallback = new Cesium.CallbackProperty((time, result) => {
+                const x = MODEL_OFFSET_X + app.debugOffsets.x;
+                const y = MODEL_OFFSET_Y + app.debugOffsets.y;
+                const z = MODEL_OFFSET_Z + app.debugOffsets.z;
+
+                // Reuse result object if available for performance
+                if (!result) {
+                    return new Cesium.Cartesian3(x, y, z);
+                }
+                result.x = x;
+                result.y = y;
+                result.z = z;
+                return result;
+            }, false);
+
+            // Create NodeTransformationProperty
+            const nodeTransform = new Cesium.NodeTransformationProperty({
+                translation: translationCallback
+            });
+
+            // Targets based on debug output
+            const transformations = {
+                'Sketchfab_model': nodeTransform,
+                'ba14754abb1947bba7d9b51a2bc63084.fbx': nodeTransform,
+                'RootNode': nodeTransform
+            };
+
             visualEntity = entities.add({
                 id: id,
+                // Direct position reference (No World Offset)
+                position: trackEntity.position,
+                orientation: trackEntity.orientation,
                 // Model Definition
                 model: {
                     uri: `${import.meta.env.BASE_URL}assets/boeing_767-200er.glb`,
                     minimumPixelSize: 64,
                     maximumScale: 200,
                     scale: 1.0,
-                    runAnimations: false
+                    runAnimations: false,
+                    nodeTransformations: transformations
                 },
-                // Label (Moved from Track)
+                // Label
                 label: {
                     text: callsign?.trim() || icao24,
                     font: '12px JetBrains Mono',
@@ -616,7 +654,7 @@ function updateAircraftDisplay(aircraftData) {
                     distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000),
                     disableDepthTestDistance: Number.POSITIVE_INFINITY
                 },
-                // Properties (Moved from Track)
+                // Properties
                 properties: {
                     callsign: callsign?.trim() || 'N/A',
                     altitude: Math.round(baro_altitude || geo_altitude || 0),
@@ -626,26 +664,6 @@ function updateAircraftDisplay(aircraftData) {
                     type: 'aircraft'
                 }
             });
-
-            // Sync Orientation
-            visualEntity.orientation = trackEntity.orientation;
-
-            // Position Callback with Offset
-            // CRITICAL FIX: Use correct axis mapping (X=Left/Right, Y=Forward/Back, Z=Up)
-            visualEntity.position = new Cesium.CallbackProperty((time) => {
-                const pos = trackEntity.position.getValue(time);
-                const orient = trackEntity.orientation.getValue(time);
-
-                if (!pos || !orient) return pos;
-
-                const matrix = Cesium.Matrix3.fromQuaternion(orient);
-                // Corrected: X for lateral, Y for forward/back
-                const offset = new Cesium.Cartesian3(OFFSET_LEFT, OFFSET_FORWARD, 0);
-                const worldOffset = Cesium.Matrix3.multiplyByVector(matrix, offset, new Cesium.Cartesian3());
-
-                return Cesium.Cartesian3.add(pos, worldOffset, new Cesium.Cartesian3());
-            }, false);
-
         } else {
             // Update Properties
             visualEntity.label.text = callsign?.trim() || icao24;
@@ -653,9 +671,14 @@ function updateAircraftDisplay(aircraftData) {
             visualEntity.properties.velocity = Math.round(velocity || 0);
             visualEntity.properties.heading = Math.round(heading);
 
-            // Re-bind orientation if needed (usually stays linked)
+            // Ensure orientation matches
             if (visualEntity.orientation !== trackEntity.orientation) {
                 visualEntity.orientation = trackEntity.orientation;
+            }
+
+            // Sync position if needed (Direct reference)
+            if (visualEntity.position !== trackEntity.position) {
+                visualEntity.position = trackEntity.position;
             }
         }
     });
@@ -792,15 +815,53 @@ function updateCamera() {
         );
 
         // For true cockpit we'd need to calculate World Coordinate of the nose.
-        // Let's stick to "Close Chase" as "Cockpit" for safe implementation without complex matrix math in one go.
-        // Actually, let's try 0.1 range.
-        const closeRange = new Cesium.HeadingPitchRange(
-            heading,
-            pitch + Cesium.Math.toRadians(-5), // Slight down tilt
-            20 // 20m behind (Close Follow)
-        );
+        // B767 length is approx 48m. Center to nose is ~24m.
+        // Let's position camera 35m forward (ahead of nose) for a clear view
 
-        app.viewer.camera.lookAt(position, closeRange);
+        // Calculate offset in model space (Y is forward in our offset logic?)
+        // Wait, in Cesium Model coordinates:
+        // +X: Right
+        // +Y: Up (or Forward depending on model axis)
+        // +Z: Backward?
+        // Let's rely on the entity orientation which we use for the offsets.
+        // In our offset logic earlier: Y was Forward/Backward.
+        // Let's use a HeadingPitchRange with an offset?
+
+        // Actually, HeadingPitchRange is relative to the center.
+        // We want a fixed offset from the center, rotating with the plane.
+
+        // Using EntityView or similar would be easier, but let's do manual calculation
+        // consistent with our "offset" logic using the entity's orientation matrix.
+
+        const centerPos = entity.position.getValue(app.viewer.clock.currentTime);
+        const orientationQ = entity.orientation.getValue(app.viewer.clock.currentTime);
+
+        if (centerPos && orientationQ) {
+            const matrix3 = Cesium.Matrix3.fromQuaternion(orientationQ);
+
+            // Offset for Pilot View: ~35m Forward, ~2m Up
+            // Based on our debug offsets: Y is Forward.
+            const pilotOffset = new Cesium.Cartesian3(0.0, 35.0, 2.0);
+            const offsetWorld = Cesium.Matrix3.multiplyByVector(matrix3, pilotOffset, new Cesium.Cartesian3());
+            const cameraPos = Cesium.Cartesian3.add(centerPos, offsetWorld, new Cesium.Cartesian3());
+
+            const upVector = Cesium.Matrix3.multiplyByVector(matrix3, new Cesium.Cartesian3(0, 0, 1), new Cesium.Cartesian3());
+            const forwardVector = Cesium.Matrix3.multiplyByVector(matrix3, new Cesium.Cartesian3(0, 1, 0), new Cesium.Cartesian3());
+
+            app.viewer.camera.setView({
+                destination: cameraPos,
+                orientation: {
+                    direction: forwardVector,
+                    up: upVector
+                }
+            });
+        }
+
+        // Note: lookAt locks the target. setView is free but we update it every frame.
+        // Since we are in an update loop (updateCamera), setView is fine.
+        // We must NOT use lookAt here if we want to look AWAY from the plane.
+
+        return; // Skip the lookAt call below
     }
 }
 
@@ -938,7 +999,111 @@ function setupEventListeners() {
         });
     });
 
+    // Debug Toggle Button
+    document.getElementById('debugToggle')?.addEventListener('click', () => {
+        app.debugMode = !app.debugMode;
+        const debugPanel = document.getElementById('debugPanel');
+
+        if (app.debugMode) {
+            debugPanel?.classList.remove('hidden');
+            console.log('🔧 Debug Mode ENABLED - Use WASDQE keys to adjust aircraft position');
+        } else {
+            debugPanel?.classList.add('hidden');
+            console.log('🔧 Debug Mode DISABLED');
+        }
+    });
+
+    // Debug Panel - Close Button
+    document.getElementById('closeDebug')?.addEventListener('click', () => {
+        app.debugMode = false;
+        document.getElementById('debugPanel')?.classList.add('hidden');
+    });
+
+    // Debug Panel - Reset Offsets
+    document.getElementById('resetOffsets')?.addEventListener('click', () => {
+        app.debugOffsets.x = 0.0;
+        app.debugOffsets.y = 0.0;
+        app.debugOffsets.z = 0.0;
+        updateDebugUI();
+        console.log('🔧 Offsets reset to zero');
+    });
+
+    // Debug Panel - Copy Offsets
+    document.getElementById('copyOffsets')?.addEventListener('click', () => {
+        const offsetText = `// Aircraft Model Offsets\nconst MODEL_OFFSET_X = ${app.debugOffsets.x.toFixed(2)}; // Left/Right\nconst MODEL_OFFSET_Y = ${app.debugOffsets.y.toFixed(2)}; // Forward/Backward\nconst MODEL_OFFSET_Z = ${app.debugOffsets.z.toFixed(2)}; // Up/Down`;
+
+        navigator.clipboard.writeText(offsetText).then(() => {
+            console.log('✅ Offset values copied to clipboard!');
+            console.log(offsetText);
+            alert('Offset values copied to clipboard!');
+        }).catch(err => {
+            console.error('❌ Failed to copy:', err);
+        });
+    });
+
+    // Debug Panel - Apply Offsets to All
+    document.getElementById('applyOffsets')?.addEventListener('click', () => {
+        console.log('✅ Offsets saved and will be applied to all aircraft:', app.debugOffsets);
+        alert(`Offsets applied: X=${app.debugOffsets.x.toFixed(2)}m, Y=${app.debugOffsets.y.toFixed(2)}m, Z=${app.debugOffsets.z.toFixed(2)}m`);
+        // The offsets are already being used in the position calculation, so just confirm
+    });
+
+    // Keyboard Controls for Debug Mode
+    document.addEventListener('keydown', (event) => {
+        if (!app.debugMode || !app.selectedAircraft) return;
+
+        // Prevent default behavior for our control keys
+        const controlKeys = ['w', 'a', 's', 'd', 'q', 'e', 'W', 'A', 'S', 'D', 'Q', 'E'];
+        if (controlKeys.includes(event.key)) {
+            event.preventDefault();
+        }
+
+        // Determine adjustment magnitude
+        let step = 1.0; // Default: 1 meter
+        if (event.shiftKey) step = 0.1; // Fine: 0.1 meters
+        if (event.ctrlKey) step = 10.0; // Coarse: 10 meters
+
+        // Apply adjustments based on key
+        switch (event.key.toLowerCase()) {
+            case 'a': // Move Left
+                app.debugOffsets.x -= step;
+                break;
+            case 'd': // Move Right
+                app.debugOffsets.x += step;
+                break;
+            case 'w': // Move Forward
+                app.debugOffsets.y += step;
+                break;
+            case 's': // Move Backward
+                app.debugOffsets.y -= step;
+                break;
+            case 'q': // Move Down
+                app.debugOffsets.z -= step;
+                break;
+            case 'e': // Move Up
+                app.debugOffsets.z += step;
+                break;
+            default:
+                return; // Not a control key, don't update UI
+        }
+
+        updateDebugUI();
+        console.log(`🔧 Offset adjusted: X=${app.debugOffsets.x.toFixed(2)}, Y=${app.debugOffsets.y.toFixed(2)}, Z=${app.debugOffsets.z.toFixed(2)}`);
+    });
+
     setupFilterListeners();
+}
+
+/**
+ * Update Debug UI with current offset values
+ */
+function updateDebugUI() {
+    document.getElementById('debugOffsetX').textContent = `${app.debugOffsets.x.toFixed(2)} m`;
+    document.getElementById('debugOffsetY').textContent = `${app.debugOffsets.y.toFixed(2)} m`;
+    document.getElementById('debugOffsetZ').textContent = `${app.debugOffsets.z.toFixed(2)} m`;
+
+    setupFilterListeners();
+
 }
 
 /**

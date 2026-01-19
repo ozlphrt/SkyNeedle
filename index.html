@@ -81,6 +81,7 @@
         <button class="camera-btn" id="cameraTrack">TRACK</button>
         <button class="camera-btn" id="cameraFollow">FOLLOW</button>
         <button class="camera-btn" id="cameraCockpit">COCKPIT</button>
+        <button class="camera-btn debug-toggle-btn" id="debugToggle">DEBUG</button>
       </div>
 
       <!-- Filter Panel -->
@@ -103,6 +104,43 @@
             <span class="checkmark"></span>
             SHOW TRACES
           </label>
+        </div>
+      </div>
+
+      <!-- Debug Panel for Aircraft Alignment -->
+      <div id="debugPanel" class="panel debug-panel hidden">
+        <div class="panel-header">
+          <h2 class="panel-title">DEBUG: AIRCRAFT ALIGNMENT</h2>
+          <button class="close-btn" id="closeDebug">×</button>
+        </div>
+        <div class="panel-content">
+          <div class="debug-info">
+            <p class="debug-instruction">Use keyboard to adjust aircraft position:</p>
+            <ul class="debug-controls">
+              <li><strong>A/D</strong> - Move Left/Right (X-axis)</li>
+              <li><strong>W/S</strong> - Move Forward/Backward (Y-axis)</li>
+              <li><strong>Q/E</strong> - Move Up/Down (Z-axis)</li>
+              <li><strong>Shift</strong> + Key - Fine adjustment (0.1m)</li>
+              <li><strong>Ctrl</strong> + Key - Coarse adjustment (10m)</li>
+            </ul>
+          </div>
+          <div class="data-row">
+            <span class="data-label">X Offset (Left/Right):</span>
+            <span class="data-value" id="debugOffsetX">0.00 m</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Y Offset (Forward/Back):</span>
+            <span class="data-value" id="debugOffsetY">0.00 m</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Z Offset (Up/Down):</span>
+            <span class="data-value" id="debugOffsetZ">0.00 m</span>
+          </div>
+        </div>
+        <div class="panel-actions">
+          <button class="action-btn" id="resetOffsets">RESET</button>
+          <button class="action-btn" id="copyOffsets">COPY VALUES</button>
+          <button class="action-btn primary-btn" id="applyOffsets">APPLY TO ALL</button>
         </div>
       </div>
     </div>

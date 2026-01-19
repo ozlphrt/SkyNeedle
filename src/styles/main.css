@@ -574,3 +574,72 @@ body {
     bottom: var(--spacing-md);
   }
 }
+
+/* === Debug Panel === */
+.debug-panel {
+  position: absolute;
+  top: 100px;
+  left: var(--spacing-lg);
+  width: 260px;
+  background: rgba(18, 24, 32, 0.7);
+  /* More transparent */
+  padding: var(--spacing-sm);
+  z-index: 2000;
+  max-width: 90vw;
+}
+
+.debug-info {
+  margin-bottom: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.debug-instruction {
+  font-size: 11px;
+  color: var(--color-secondary);
+  margin-bottom: 4px;
+}
+
+.debug-controls {
+  list-style: none;
+  font-size: 10px;
+  color: var(--color-text-dim);
+  padding-left: 0;
+}
+
+.debug-controls li {
+  margin-bottom: 2px;
+}
+
+.debug-panel .data-row {
+  padding: 2px 0;
+  border-bottom: none;
+}
+
+.debug-panel .data-label {
+  font-size: 11px;
+}
+
+.debug-panel .data-value {
+  font-size: 12px;
+}
+
+.debug-panel .panel-header {
+  margin-bottom: var(--spacing-sm);
+  padding-bottom: 4px;
+}
+
+.debug-panel .panel-title {
+  font-size: 14px;
+}
+
+.debug-panel .panel-actions {
+  margin-top: var(--spacing-sm);
+  gap: 4px;
+}
+
+.debug-panel .action-btn {
+  padding: 4px 8px;
+  font-size: 10px;
+}
