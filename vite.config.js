@@ -3,10 +3,9 @@ import cesium from 'vite-plugin-cesium';
 
 export default defineConfig({
   plugins: [cesium({
-    // Ensure Cesium assets are copied to the correct output directory
     rebuildCesium: false
   })],
-  base: '/SkyNeedle/',  // GitHub Pages repository path
+  base: '/',  // GitHub Pages serves dist/ at /SkyNeedle/ automatically
   build: {
     outDir: 'dist',
     sourcemap: true
