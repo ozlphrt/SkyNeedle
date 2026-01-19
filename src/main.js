@@ -597,7 +597,7 @@ function updateAircraftDisplay(aircraftData) {
                 id: id,
                 // Model Definition
                 model: {
-                    uri: '/SkyNeedle/assets/boeing_767-200er.glb',
+                    uri: `${import.meta.env.BASE_URL}assets/boeing_767-200er.glb`,
                     minimumPixelSize: 64,
                     maximumScale: 200,
                     scale: 1.0,
