@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [cesium({
     rebuildCesium: false
   })],
-  base: '/',  // GitHub Pages serves dist/ at /SkyNeedle/ automatically
+  base: '/SkyNeedle/',  // GitHub Pages serves dist/ at /SkyNeedle/ automatically
   build: {
     outDir: 'dist',
     sourcemap: true
