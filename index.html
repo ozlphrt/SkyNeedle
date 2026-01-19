@@ -49,9 +49,19 @@
         </div>
         <div class="panel-content">
           <div class="data-row">
+            <span class="data-label">AIRLINER:</span>
+            <span class="data-value" id="detailAirliner">—</span>
+          </div>
+          <div class="data-row">
             <span class="data-label">CALLSIGN:</span>
             <span class="data-value" id="detailCallsign">—</span>
           </div>
+
+          <div class="data-row">
+            <span class="data-label">FLIGHT #:</span>
+            <span class="data-value" id="detailFlightNum">—</span>
+          </div>
+
           <div class="data-row">
             <span class="data-label">ALTITUDE:</span>
             <span class="data-value" id="detailAltitude">—</span>
@@ -69,79 +79,104 @@
             <span class="data-value" id="detailOrigin">—</span>
           </div>
         </div>
-        <div class="panel-actions">
-          <button class="action-btn" id="trackAircraft">TRACK</button>
-          <button class="action-btn" id="followAircraft">FOLLOW</button>
+        <div class="panel-actions detail-actions">
+          <button class="action-icon-btn" id="detailOverview" title="OVERVIEW">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+              </path>
+            </svg>
+          </button>
+          <button class="action-icon-btn" id="detailTrack" title="TRACK">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="22" y1="12" x2="18" y2="12"></line>
+              <line x1="6" y1="12" x2="2" y2="12"></line>
+              <line x1="12" y1="6" x2="12" y2="2"></line>
+              <line x1="12" y1="22" x2="12" y2="18"></line>
+            </svg>
+          </button>
+          <button class="action-icon-btn" id="detailFollow" title="FOLLOW">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path
+                d="M17.8 19.2L16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z">
+              </path>
+            </svg>
+          </button>
+          <button class="action-icon-btn" id="detailGround" title="GROUND VIEW">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round">
+              <path d="M3 21h18"></path>
+              <path d="M9 7v1h6V7l-3-3-3 3z"></path>
+              <path d="M10 21V11h4v10"></path>
+              <path d="M4 21V9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12"></path>
+            </svg>
+          </button>
+          <div class="separator"></div>
+          <button class="action-icon-btn active" id="toggleAirports" aria-label="TOGGLE AIRPORTS"
+            title="TOGGLE AIRPORTS">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 21H5l3-18h8l3 18z" />
+              <line x1="12" y1="21" x2="12" y2="17" />
+              <line x1="12" y1="14" x2="12" y2="10" />
+              <line x1="12" y1="7" x2="12" y2="3" />
+            </svg>
+          </button>
+          <button class="action-icon-btn active" id="toggleTraces" aria-label="TOGGLE TRACES" title="TOGGLE TRACES">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="5" cy="19" r="2" />
+              <path d="M7 19c5 0 10-5 10-14" />
+              <path d="M13 5h4v4" />
+            </svg>
+          </button>
         </div>
       </div>
 
-      <!-- Camera Controls -->
-      <div id="cameraControls" class="panel camera-panel">
-        <button class="camera-btn" id="cameraOverview">OVERVIEW</button>
-        <button class="camera-btn" id="cameraTrack">TRACK</button>
-        <button class="camera-btn" id="cameraFollow">FOLLOW</button>
-        <button class="camera-btn" id="cameraCockpit">COCKPIT</button>
-        <button class="camera-btn debug-toggle-btn" id="debugToggle">DEBUG</button>
+
+
+
+    </div>
+
+    <!-- Debug Panel for Aircraft Alignment -->
+    <div id="debugPanel" class="panel debug-panel hidden">
+      <div class="panel-header">
+        <h2 class="panel-title">DEBUG: AIRCRAFT ALIGNMENT</h2>
+        <button class="close-btn" id="closeDebug">×</button>
       </div>
-
-      <!-- Filter Panel -->
-      <div id="filterPanel" class="panel filter-panel">
-        <label class="filter-label">ALTITUDE RANGE</label>
-        <div class="range-slider-container">
-          <div class="slider-track"></div>
-          <input type="range" id="altitudeMin" class="dual-slider" min="0" max="50000" value="0">
-          <input type="range" id="altitudeMax" class="dual-slider" min="0" max="50000" value="50000">
+      <div class="panel-content">
+        <div class="debug-info">
+          <p class="debug-instruction">Use keyboard to adjust aircraft position:</p>
+          <ul class="debug-controls">
+            <li><strong>A/D</strong> - Move Left/Right (X-axis)</li>
+            <li><strong>W/S</strong> - Move Forward/Backward (Y-axis)</li>
+            <li><strong>Q/E</strong> - Move Up/Down (Z-axis)</li>
+            <li><strong>Shift</strong> + Key - Fine adjustment (0.1m)</li>
+            <li><strong>Ctrl</strong> + Key - Coarse adjustment (10m)</li>
+          </ul>
         </div>
-
-        <div class="checkbox-group">
-          <label class="custom-checkbox">
-            <input type="checkbox" id="showAirports" checked>
-            <span class="checkmark"></span>
-            SHOW AIRPORTS
-          </label>
-          <label class="custom-checkbox">
-            <input type="checkbox" id="showTraces" checked>
-            <span class="checkmark"></span>
-            SHOW TRACES
-          </label>
+        <div class="data-row">
+          <span class="data-label">X Offset (Left/Right):</span>
+          <span class="data-value" id="debugOffsetX">0.00 m</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Y Offset (Forward/Back):</span>
+          <span class="data-value" id="debugOffsetY">0.00 m</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Z Offset (Up/Down):</span>
+          <span class="data-value" id="debugOffsetZ">0.00 m</span>
         </div>
       </div>
-
-      <!-- Debug Panel for Aircraft Alignment -->
-      <div id="debugPanel" class="panel debug-panel hidden">
-        <div class="panel-header">
-          <h2 class="panel-title">DEBUG: AIRCRAFT ALIGNMENT</h2>
-          <button class="close-btn" id="closeDebug">×</button>
-        </div>
-        <div class="panel-content">
-          <div class="debug-info">
-            <p class="debug-instruction">Use keyboard to adjust aircraft position:</p>
-            <ul class="debug-controls">
-              <li><strong>A/D</strong> - Move Left/Right (X-axis)</li>
-              <li><strong>W/S</strong> - Move Forward/Backward (Y-axis)</li>
-              <li><strong>Q/E</strong> - Move Up/Down (Z-axis)</li>
-              <li><strong>Shift</strong> + Key - Fine adjustment (0.1m)</li>
-              <li><strong>Ctrl</strong> + Key - Coarse adjustment (10m)</li>
-            </ul>
-          </div>
-          <div class="data-row">
-            <span class="data-label">X Offset (Left/Right):</span>
-            <span class="data-value" id="debugOffsetX">0.00 m</span>
-          </div>
-          <div class="data-row">
-            <span class="data-label">Y Offset (Forward/Back):</span>
-            <span class="data-value" id="debugOffsetY">0.00 m</span>
-          </div>
-          <div class="data-row">
-            <span class="data-label">Z Offset (Up/Down):</span>
-            <span class="data-value" id="debugOffsetZ">0.00 m</span>
-          </div>
-        </div>
-        <div class="panel-actions">
-          <button class="action-btn" id="resetOffsets">RESET</button>
-          <button class="action-btn" id="copyOffsets">COPY VALUES</button>
-          <button class="action-btn primary-btn" id="applyOffsets">APPLY TO ALL</button>
-        </div>
+      <div class="panel-actions">
+        <button class="action-btn" id="resetOffsets">RESET</button>
+        <button class="action-btn" id="copyOffsets">COPY VALUES</button>
+        <button class="action-btn primary-btn" id="applyOffsets">APPLY TO ALL</button>
       </div>
     </div>
 

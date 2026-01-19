@@ -1,6 +1,6 @@
 {
   "name": "skyneedle",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "3D Flight Tracking PWA with ATC-inspired interface",
   "type": "module",
   "scripts": {

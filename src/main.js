@@ -5,12 +5,64 @@
 
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
+import { loadRunwaySurfaces } from './airportLoader.js';
 
 // Configuration - Using environment variables
 const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3N2VmNjQ5YS00MzNiLTRjODUtYTYwMS1hZjIwOGM3YWFkMDUiLCJpZCI6MzgwMzQwLCJpYXQiOjE3Njg3NDA5ODB9.ILdx02CrRUguqA-msX6n5l9-NRFuF6oHPGtqlgabJB4';
 const OPENSKY_USERNAME = import.meta.env.VITE_OPENSKY_USERNAME || '';
 const OPENSKY_PASSWORD = import.meta.env.VITE_OPENSKY_PASSWORD || '';
 const MAX_AIRCRAFT_DISPLAY = 500; // Maximum number of aircraft to display at once
+
+// common ICAO airline codes for lookup
+// Airline Data with IATA Codes
+const ICAO_AIRLINES = {
+    'THY': { name: 'Turkish Airlines', iata: 'TK' },
+    'PGT': { name: 'Pegasus Airlines', iata: 'PC' },
+    'BAW': { name: 'British Airways', iata: 'BA' },
+    'DLH': { name: 'Lufthansa', iata: 'LH' },
+    'AFR': { name: 'Air France', iata: 'AF' },
+    'KLM': { name: 'KLM Royal Dutch', iata: 'KL' },
+    'UAE': { name: 'Emirates', iata: 'EK' },
+    'QTR': { name: 'Qatar Airways', iata: 'QR' },
+    'ETD': { name: 'Etihad Airways', iata: 'EY' },
+    'DL': { name: 'Delta Air Lines', iata: 'DL' },
+    'AAL': { name: 'American Airlines', iata: 'AA' },
+    'UAL': { name: 'United Airlines', iata: 'UA' },
+    'RYR': { name: 'Ryanair', iata: 'FR' },
+    'EZY': { name: 'EasyJet', iata: 'U2' },
+    'WZZ': { name: 'Wizz Air', iata: 'W6' },
+    'SWR': { name: 'Swiss International', iata: 'LX' },
+    'AZA': { name: 'Alitalia', iata: 'AZ' },
+    'TAP': { name: 'TAP Air Portugal', iata: 'TP' },
+    'LOT': { name: 'LOT Polish Airlines', iata: 'LO' },
+    'ELY': { name: 'El Al', iata: 'LY' },
+    'FDB': { name: 'FlyDubai', iata: 'FZ' },
+    'RJA': { name: 'Royal Jordanian', iata: 'RJ' },
+    'MEA': { name: 'Middle East Airlines', iata: 'ME' },
+    'MSR': { name: 'EgyptAir', iata: 'MS' },
+    'RAM': { name: 'Royal Air Maroc', iata: 'AT' },
+    'ETH': { name: 'Ethiopian Airlines', iata: 'ET' },
+    'SVA': { name: 'Saudia', iata: 'SV' },
+    'QFA': { name: 'Qantas', iata: 'QF' },
+    'JAL': { name: 'Japan Airlines', iata: 'JL' },
+    'ANA': { name: 'All Nippon Airways', iata: 'NH' },
+    'CPA': { name: 'Cathay Pacific', iata: 'CX' },
+    'PIA': { name: 'Pakistan International', iata: 'PK' },
+    'AIC': { name: 'Air India', iata: 'AI' },
+    'CCA': { name: 'Air China', iata: 'CA' },
+    'CES': { name: 'China Eastern', iata: 'MU' },
+    'CSN': { name: 'China Southern', iata: 'CZ' },
+    'MAS': { name: 'Malaysia Airlines', iata: 'MH' },
+    'SIA': { name: 'Singapore Airlines', iata: 'SQ' },
+    'THA': { name: 'Thai Airways', iata: 'TG' },
+    'KAL': { name: 'Korean Air', iata: 'KE' },
+    'ANZ': { name: 'Air New Zealand', iata: 'NZ' },
+    'ACA': { name: 'Air Canada', iata: 'AC' },
+    'AMX': { name: 'Aeromexico', iata: 'AM' },
+    'LAN': { name: 'LATAM Airlines', iata: 'LA' },
+    'AVA': { name: 'Avianca', iata: 'AV' }
+};
+
 const AIRPORTS = [
     { name: 'Istanbul Airport', icao: 'LTFM', lat: 41.275, lon: 28.751, alt: 99 },
     { name: 'Sabiha Gokcen', icao: 'LTFJ', lat: 40.898, lon: 29.309, alt: 93 },
@@ -21,7 +73,7 @@ const AIRPORTS = [
     { name: 'Dalaman Airport', icao: 'LTBS', lat: 36.716, lon: 28.791, alt: 6 },
     { name: 'Adana Sakirpasa', icao: 'LTAF', lat: 36.982, lon: 35.280, alt: 20 },
     { name: 'Trabzon Airport', icao: 'LTCG', lat: 40.995, lon: 39.789, alt: 31 },
-    { name: 'JFK International', icao: 'KJFK', lat: 40.641, lon: -73.778, alt: 4 },
+    { name: 'JFK International', icao: 'KJFK', lat: 40.645, lon: -73.785, alt: 10 },
     { name: 'Heathrow Airport', icao: 'EGLL', lat: 51.470, lon: -0.454, alt: 25 },
     { name: 'Frankfurt Airport', icao: 'EDDF', lat: 50.037, lon: 8.562, alt: 111 },
     { name: 'Dubai International', icao: 'OMDB', lat: 25.253, lon: 55.365, alt: 19 }
@@ -40,21 +92,22 @@ const app = {
     cameraMoveTimeout: null,
     lastAircraftData: [], // Store raw data for re-filtering
     filters: {
-        minAltitude: 0,
-        maxAltitude: 50000,
         showAirports: true,
-        showTraces: true
+        showTraces: false
     },
     searchQuery: '', // Search query string
     trackedEntity: null,
     followMode: 'NONE', // 'NONE', 'TRACK', 'FOLLOW', 'COCKPIT'
+    geocoder: null, // Geocoder service
+    searchTimeout: null, // Timeout for debouncing search
     // Debug mode for manual alignment
     debugMode: false,
     debugOffsets: {
         x: 0.0,  // Left/Right (meters)
         y: 0.0,  // Forward/Backward (meters)
         z: 0.0   // Up/Down (meters)
-    }
+    },
+    selectionBracket: null // Selection bracket entity
 };
 
 /**
@@ -73,13 +126,21 @@ async function initCesiumViewer() {
     app.viewer = new Cesium.Viewer('cesiumContainer', {
         // Terrain and imagery
         terrain: Cesium.Terrain.fromWorldTerrain(),
-        baseLayer: Cesium.ImageryLayer.fromWorldImagery({
-            style: Cesium.IonWorldImageryStyle.AERIAL_WITH_LABELS
-        }),
+        baseLayer: (function () {
+            const layer = Cesium.ImageryLayer.fromWorldImagery({
+                style: Cesium.IonWorldImageryStyle.AERIAL
+            });
+            layer.brightness = 0.6;
+            layer.contrast = 1.2;
+            layer.saturation = 0.2;
+            return layer;
+        })(),
 
         // Disable default UI
         animation: false,
         timeline: false,
+        infoBox: false,
+        selectionIndicator: false,
         baseLayerPicker: false,
         geocoder: false,
         homeButton: false,
@@ -106,6 +167,9 @@ async function initCesiumViewer() {
     scene.backgroundColor = Cesium.Color.fromCssColorString('#000000');
     scene.globe.enableLighting = false; // Disable sun lighting on globe
 
+    // Initialize Geocoder Service (Now with scene reference)
+    app.geocoder = new Cesium.IonGeocoderService({ scene: scene });
+
     // FIX LIGHTING: Add a fixed directional light for 3D models (like the aircraft)
     scene.light = new Cesium.DirectionalLight({
         direction: new Cesium.Cartesian3(0.0, 0.0, -1.0), // Illuminating straight down
@@ -125,48 +189,198 @@ async function initCesiumViewer() {
     // Hook into the render loop for camera updates
     app.viewer.scene.preUpdate.addEventListener(updateCamera);
 
+    // Initialize Selection Bracket
+    createSelectionBracket();
+
     // Initialize Airports
     initializeAirports();
+
+    // Load Runway and Taxiway Details
+    loadRunwaySurfaces(app.viewer, app);
+
+    // REMOVED: Real-time UI updates (per user request to fix inconsistencies)
+    // app.viewer.scene.preUpdate.addEventListener(updateSelectedAircraftUI);
 
     console.log('Cesium viewer initialized');
 }
 
 /**
- * Initialize Airport Markers
+ * Load and render runway/taxiway surfaces
  */
-function initializeAirports() {
+async function loadRunwaySurfaces_OLD() {
+    console.log('Loading airport details...');
+    try {
+        const response = await fetch(`${import.meta.env.BASE_URL}assets/airport_details.json`);
+        if (!response.ok) throw new Error('Failed to load airport details');
+
+        const data = await response.json();
+
+        // Create a data source for airport surfaces
+        const dataSource = new Cesium.CustomDataSource('airport-surfaces');
+        app.viewer.dataSources.add(dataSource);
+
+        Object.entries(data).forEach(([icao, details]) => {
+            // Render Runways
+            if (details.runways) {
+                details.runways.forEach(feature => {
+                    const diffCoords = feature.geometry.coordinates;
+                    // Flatten coordinates for Cesium
+                    const positions = diffCoords.flat();
+
+                    dataSource.entities.add({
+                        show: new Cesium.CallbackProperty(() => app.filters.showAirports, false),
+                        corridor: {
+                            positions: Cesium.Cartesian3.fromDegreesArray(positions),
+                            width: 45.0, // 45 meters wide
+                            material: Cesium.Color.fromCssColorString('#00ff41').withAlpha(0.3), // Cyber Green
+                            cornerType: Cesium.CornerType.MITERED,
+                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                            // Only show when camera is relatively close
+                            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
+                        }
+                    });
+                });
+            }
+
+            // Render Taxiways
+            if (details.taxiways) {
+                details.taxiways.forEach(feature => {
+                    const diffCoords = feature.geometry.coordinates;
+                    const positions = diffCoords.flat();
+
+                    dataSource.entities.add({
+                        corridor: {
+                            positions: Cesium.Cartesian3.fromDegreesArray(positions),
+                            width: 20.0, // 20 meters wide
+                            material: Cesium.Color.fromCssColorString('#00ff41').withAlpha(0.15), // Fainter Green
+                            cornerType: Cesium.CornerType.ROUNDED,
+                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
+                        }
+                    });
+                });
+            }
+        });
+
+        console.log('✅ Airport surfaces loaded');
+
+    } catch (error) {
+        console.error('❌ Error loading airport details:', error);
+    }
+}
+
+/**
+ * Create custom selection bracket entity
+ */
+function createSelectionBracket() {
+    if (!app.viewer) return;
+
+    // Create a canvas for the bracket
+    const size = 64;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    const color = '#00ff41';
+    const thickness = 4;
+    const len = 16;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = thickness;
+    ctx.lineCap = 'round';
+
+    // Top Left
+    ctx.beginPath();
+    ctx.moveTo(thickness, thickness + len);
+    ctx.lineTo(thickness, thickness);
+    ctx.lineTo(thickness + len, thickness);
+    ctx.stroke();
+
+    // Top Right
+    ctx.beginPath();
+    ctx.moveTo(size - thickness - len, thickness);
+    ctx.lineTo(size - thickness, thickness);
+    ctx.lineTo(size - thickness, thickness + len);
+    ctx.stroke();
+
+    // Bottom Left
+    ctx.beginPath();
+    ctx.moveTo(thickness, size - thickness - len);
+    ctx.lineTo(thickness, size - thickness);
+    ctx.lineTo(thickness + len, size - thickness);
+    ctx.stroke();
+
+    // Bottom Right
+    ctx.beginPath();
+    ctx.moveTo(size - thickness - len, size - thickness);
+    ctx.lineTo(size - thickness, size - thickness);
+    ctx.lineTo(size - thickness, size - thickness - len);
+    ctx.stroke();
+
+    app.selectionBracket = app.viewer.entities.add({
+        id: 'selection-bracket',
+        show: false,
+        billboard: {
+            image: canvas,
+            scale: 1.0,
+            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+            verticalOrigin: Cesium.VerticalOrigin.CENTER,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always on top
+            pixelOffset: new Cesium.Cartesian2(0, 0)
+        }
+    });
+}
+
+/**
+ * Initialize Airport Markers
+ * @param {Array<string>} hiddenIcaos - List of airport ICAOs to hide (because they have detailed surfaces)
+ */
+function initializeAirports(hiddenIcaos = []) {
     if (!app.viewer) return;
 
     const pinBuilder = new Cesium.PinBuilder();
 
     AIRPORTS.forEach(airport => {
-        app.viewer.entities.add({
+        // Check if this airport has detailed surfaces (should be hidden)
+        const shouldHideVisuals = hiddenIcaos.includes(airport.icao);
+
+        const entityOptions = {
             id: `airport-${airport.icao}`,
             position: Cesium.Cartesian3.fromDegrees(airport.lon, airport.lat, airport.alt),
-            billboard: {
-                image: pinBuilder.fromText(airport.icao, Cesium.Color.ROYALBLUE, 48).toDataURL(),
-                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false)
-            },
-            label: {
-                text: airport.name,
-                font: '14px JetBrains Mono',
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.BLACK,
-                outlineWidth: 2,
-                verticalOrigin: Cesium.VerticalOrigin.TOP,
-                pixelOffset: new Cesium.Cartesian2(0, 5),
-                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000), // Hide when zoomed out
-                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false)
-            },
             properties: {
                 type: 'airport',
                 name: airport.name,
                 icao: airport.icao
             }
-        });
+        };
+
+        // Only add visuals if NOT in the hidden list
+        if (!shouldHideVisuals) {
+            entityOptions.point = {
+                pixelSize: 8,
+                color: Cesium.Color.WHITE.withAlpha(0.8),
+                outlineColor: Cesium.Color.BLACK,
+                outlineWidth: 1,
+                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false),
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000000) // Show from further away
+            };
+            entityOptions.label = {
+                text: airport.name,
+                font: '12px Inter, sans-serif', // Cleaner font
+                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+                fillColor: Cesium.Color.WHITE,
+                outlineColor: Cesium.Color.BLACK,
+                outlineWidth: 2,
+                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                pixelOffset: new Cesium.Cartesian2(0, -10), // Above the dot
+                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000), // Hide labels when zoomed out
+                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false)
+            };
+        }
+
+        app.viewer.entities.add(entityOptions);
     });
 }
 
@@ -346,12 +560,6 @@ function filterAircraftForDisplay(aircraftData) {
 
         // Basic validity check
         if (!longitude || !latitude || on_ground) return false;
-
-        // Altitude filter
-        const minAlt = app.filters.minAltitude / 3.28084; // Convert feet to meters
-        const maxAlt = app.filters.maxAltitude / 3.28084;
-
-        if (altitude < minAlt || altitude > maxAlt) return false;
 
         // Search Filter
         if (app.searchQuery) {
@@ -543,7 +751,7 @@ function updateAircraftDisplay(aircraftData) {
 
         const altitude = (baro_altitude || geo_altitude || 0);
         const velocityMs = (velocity || 0) * 0.51444;
-        const verticalRateMs = (vertical_rate || 0) * 0.00508;
+        const verticalRateMs = (vertical_rate || 0); // OpenSky vertical_rate is already in m/s
         const heading = true_track || 0;
 
         // --- 1. Track Entity (Physics/Path) ---
@@ -571,9 +779,37 @@ function updateAircraftDisplay(aircraftData) {
                 path: {
                     leadTime: 0,
                     trailTime: 300,
-                    width: 12,
-                    material: Cesium.Color.YELLOW.withAlpha(0.4),
+                    width: 10,
+                    material: Cesium.Color.YELLOW.withAlpha(0.25),
                     show: new Cesium.CallbackProperty(() => app.filters.showTraces, false)
+                },
+                // Drop line to ground for depth perception
+                polyline: {
+                    positions: new Cesium.CallbackProperty((time, result) => {
+                        const pos = trackEntity.position.getValue(time);
+                        if (!pos) return result;
+                        const carto = Cesium.Cartographic.fromCartesian(pos);
+                        const groundPos = Cesium.Cartesian3.fromDegrees(
+                            Cesium.Math.toDegrees(carto.longitude),
+                            Cesium.Math.toDegrees(carto.latitude),
+                            0
+                        );
+                        return [pos, groundPos];
+                    }, false),
+                    width: 1,
+                    material: new Cesium.PolylineDashMaterialProperty({
+                        color: Cesium.Color.WHITE.withAlpha(0.2),
+                        dashLength: 16
+                    }),
+                    show: new Cesium.CallbackProperty(() => {
+                        // Show if traces are enabled AND (it's selected OR camera is high up)
+                        if (!app.filters.showTraces) return false;
+                        if (app.selectedAircraft && (app.selectedAircraft.id === id || app.selectedAircraft.id === trackId)) return true;
+
+                        // Also show in overview mode (height > 50km)
+                        return app.viewer.camera.positionCartographic.height > 50000;
+                    }, false),
+                    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 1000000)
                 }
             });
         } else {
@@ -595,7 +831,7 @@ function updateAircraftDisplay(aircraftData) {
         // FIXED OFFSETS (Aligned via Manual Debug Mode)
         // These are now applied to the MODEL NODES to scale correctly with minimumPixelSize
         const MODEL_OFFSET_X = 55.40;
-        const MODEL_OFFSET_Y = -114.00;
+        const MODEL_OFFSET_Y = -55.00; // Original -114.00 + 59.00 increment
         const MODEL_OFFSET_Z = -10.00;
 
         if (!visualEntity) {
@@ -633,18 +869,43 @@ function updateAircraftDisplay(aircraftData) {
                 position: trackEntity.position,
                 orientation: trackEntity.orientation,
                 // Model Definition
+                // Model Definition
                 model: {
                     uri: `${import.meta.env.BASE_URL}assets/boeing_767-200er.glb`,
-                    minimumPixelSize: 64,
+                    minimumPixelSize: 32,
                     maximumScale: 200,
-                    scale: 1.0,
                     runAnimations: false,
-                    nodeTransformations: transformations
+                    nodeTransformations: transformations,
+
+                    // Gradual Fading via Scaling (Shrink to zero)
+                    scale: new Cesium.CallbackProperty((time, result) => {
+                        const cameraPos = app.viewer.camera.positionWC;
+                        // fast distance check using entity position
+                        const entityPos = trackEntity.position.getValue(time);
+                        if (!entityPos) return 1.0;
+
+                        const dist = Cesium.Cartesian3.distance(cameraPos, entityPos);
+
+                        // Fade range: start 50km, end 500km (User requested 500km)
+                        const near = 50000.0;
+                        const far = 500000.0;
+
+                        if (dist < near) {
+                            return 1.0;
+                        } else if (dist > far) {
+                            return 0.0; // Invisible
+                        } else {
+                            // Valid range: interpolate 1.0 -> 0.0
+                            return 1.0 - ((dist - near) / (far - near));
+                        }
+                    }, false),
+
+                    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000)
                 },
                 // Label
                 label: {
                     text: callsign?.trim() || icao24,
-                    font: '12px JetBrains Mono',
+                    font: 'bold 14px "JetBrains Mono", monospace',
                     fillColor: Cesium.Color.fromCssColorString('#00ff41'),
                     outlineColor: Cesium.Color.BLACK,
                     outlineWidth: 2,
@@ -652,6 +913,8 @@ function updateAircraftDisplay(aircraftData) {
                     verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
                     pixelOffset: new Cesium.Cartesian2(0, -20),
                     distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000),
+                    // Gradual Fading for Labels provided by Cesium
+                    translucencyByDistance: new Cesium.NearFarScalar(50000, 1.0, 500000, 0.0),
                     disableDepthTestDistance: Number.POSITIVE_INFINITY
                 },
                 // Properties
@@ -688,7 +951,11 @@ function updateAircraftDisplay(aircraftData) {
     for (let i = allEntities.length - 1; i >= 0; i--) {
         const entity = allEntities[i];
 
-        // Skip non-aircraft entities (like airports)
+        // Skip non-aircraft entities (like airports and the selection bracket)
+        if (entity.id === 'selection-bracket') {
+            continue;
+        }
+
         if (entity.properties && entity.properties.type && entity.properties.type.getValue() === 'airport') {
             continue;
         }
@@ -766,102 +1033,24 @@ function updateCamera() {
 
         app.viewer.camera.lookAt(position, headingPitchRange);
 
-    } else if (app.followMode === 'COCKPIT') {
-        // Pilot View
-        let heading = 0;
-        let pitch = 0;
-        let roll = 0;
+    } else if (app.followMode === 'GROUND') {
+        const targetPos = entity.position.getValue(app.viewer.clock.currentTime);
+        if (!targetPos || !app.groundCameraPos) return;
 
-        const orientation = entity.orientation ? entity.orientation.getValue(app.viewer.clock.currentTime) : null;
-
-        if (orientation) {
-            const hpr = Cesium.HeadingPitchRoll.fromQuaternion(orientation);
-            heading = hpr.heading;
-            pitch = hpr.pitch;
-            roll = hpr.roll;
-        } else {
-            heading = Cesium.Math.toRadians(entity.properties.heading.getValue() || 0);
-        }
-
-        // Calculate offset (visualize as if sitting in cockpit)
-        // We'll place camera slightly ahead and above center
-        // Transform offset to world coordinates
-        // Using viewer.camera.setView for strict positioning 
-
-        // Actually, lookAt works relative to center. 
-        // For cockpit, we want zero distance, facing forward.
-        // lookAt with range 0 works IF we set the correct Heading/Pitch?
-        // But lookAt points TO the center. We want to look FROM the center OUT.
-        // Better to use a fixed offset in the reference frame.
-
-        // Simplified approach: Camera at position, orientation matched.
-        // problem: the model is there. We might clip inside.
-        // let's try lookAt with very close range?
-
-        if (app.viewer.trackedEntity) {
-            app.viewer.trackedEntity = undefined;
-        }
-
-        // Adjust heading to look forward (Cesium camera heading is rotation around up vector)
-        // Check if we need offset.
-
-        const headingPitchRange = new Cesium.HeadingPitchRange(
-            heading,
-            pitch, // Match pitch
-            10 // 10 meters back? or 0? 
-            // If we use 0, we might be inside. 
-            // Using 50 meters looks like a "Third Person Close" or "Over shoulder".
-            // Let's try 20 meters.
+        // Calculate direction from ground to aircraft
+        const direction = Cesium.Cartesian3.normalize(
+            Cesium.Cartesian3.subtract(targetPos, app.groundCameraPos, new Cesium.Cartesian3()),
+            new Cesium.Cartesian3()
         );
 
-        // For true cockpit we'd need to calculate World Coordinate of the nose.
-        // B767 length is approx 48m. Center to nose is ~24m.
-        // Let's position camera 35m forward (ahead of nose) for a clear view
-
-        // Calculate offset in model space (Y is forward in our offset logic?)
-        // Wait, in Cesium Model coordinates:
-        // +X: Right
-        // +Y: Up (or Forward depending on model axis)
-        // +Z: Backward?
-        // Let's rely on the entity orientation which we use for the offsets.
-        // In our offset logic earlier: Y was Forward/Backward.
-        // Let's use a HeadingPitchRange with an offset?
-
-        // Actually, HeadingPitchRange is relative to the center.
-        // We want a fixed offset from the center, rotating with the plane.
-
-        // Using EntityView or similar would be easier, but let's do manual calculation
-        // consistent with our "offset" logic using the entity's orientation matrix.
-
-        const centerPos = entity.position.getValue(app.viewer.clock.currentTime);
-        const orientationQ = entity.orientation.getValue(app.viewer.clock.currentTime);
-
-        if (centerPos && orientationQ) {
-            const matrix3 = Cesium.Matrix3.fromQuaternion(orientationQ);
-
-            // Offset for Pilot View: ~35m Forward, ~2m Up
-            // Based on our debug offsets: Y is Forward.
-            const pilotOffset = new Cesium.Cartesian3(0.0, 35.0, 2.0);
-            const offsetWorld = Cesium.Matrix3.multiplyByVector(matrix3, pilotOffset, new Cesium.Cartesian3());
-            const cameraPos = Cesium.Cartesian3.add(centerPos, offsetWorld, new Cesium.Cartesian3());
-
-            const upVector = Cesium.Matrix3.multiplyByVector(matrix3, new Cesium.Cartesian3(0, 0, 1), new Cesium.Cartesian3());
-            const forwardVector = Cesium.Matrix3.multiplyByVector(matrix3, new Cesium.Cartesian3(0, 1, 0), new Cesium.Cartesian3());
-
-            app.viewer.camera.setView({
-                destination: cameraPos,
-                orientation: {
-                    direction: forwardVector,
-                    up: upVector
-                }
-            });
-        }
-
-        // Note: lookAt locks the target. setView is free but we update it every frame.
-        // Since we are in an update loop (updateCamera), setView is fine.
-        // We must NOT use lookAt here if we want to look AWAY from the plane.
-
-        return; // Skip the lookAt call below
+        // Update camera position and orientation
+        app.viewer.camera.setView({
+            destination: app.groundCameraPos,
+            orientation: {
+                direction: direction,
+                up: Cesium.Cartesian3.normalize(app.groundCameraPos, new Cesium.Cartesian3())
+            }
+        });
     }
 }
 
@@ -892,6 +1081,7 @@ function startTracking(entity) {
     app.followMode = 'TRACK';
     app.viewer.trackedEntity = entity;
     updateStatus(`TRACKING ${entity.properties.callsign || entity.id}`);
+    setTraceVisibility(true);
 }
 
 /**
@@ -903,17 +1093,53 @@ function startFollowing(entity) {
     app.followMode = 'FOLLOW';
     // Native tracking disabled in update loop to allow custom lookAt
     updateStatus(`FOLLOWING ${entity.properties.callsign || entity.id}`);
+    setTraceVisibility(true);
+}
+
+/**
+ * Start ground view (Look up from ground)
+ */
+function startGroundView(entity) {
+    if (!entity) return;
+
+    const position = entity.position.getValue(app.viewer.clock.currentTime);
+    if (!position) return;
+
+    const cartographic = Cesium.Cartographic.fromCartesian(position);
+
+    // Position camera on ground directly below or slightly offset
+    const groundPos = Cesium.Cartesian3.fromDegrees(
+        Cesium.Math.toDegrees(cartographic.longitude),
+        Cesium.Math.toDegrees(cartographic.latitude),
+        10 // 10 meters above ground
+    );
+
+    app.trackedEntity = entity;
+    app.followMode = 'GROUND';
+    app.groundCameraPos = groundPos;
+
+    // Release from any existing tracking
+    app.viewer.trackedEntity = undefined;
+    app.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+
+    // Smoothly fly to ground position first
+    app.viewer.camera.flyTo({
+        destination: groundPos,
+        orientation: {
+            heading: Cesium.Math.toRadians(0),
+            pitch: Cesium.Math.toRadians(45),
+            roll: 0.0
+        },
+        duration: 2
+    });
+
+    updateStatus(`GROUND VIEW: ${entity.properties.callsign || entity.id}`);
 }
 
 /**
  * Start cockpit view
  */
-function startCockpit(entity) {
-    if (!entity) return;
-    app.trackedEntity = entity;
-    app.followMode = 'COCKPIT';
-    updateStatus(`COCKPIT: ${entity.properties.callsign || entity.id}`);
-}
+
 
 /**
  * Update status indicator
@@ -946,49 +1172,55 @@ function setupEventListeners() {
     document.getElementById('closeDetails')?.addEventListener('click', () => {
         document.getElementById('aircraftDetails')?.classList.add('hidden');
         app.selectedAircraft = null;
+        if (app.selectionBracket) app.selectionBracket.show = false;
     });
 
     // Aircraft click handler
     const handler = new Cesium.ScreenSpaceEventHandler(app.viewer.scene.canvas);
     handler.setInputAction((click) => {
-        const pickedObject = app.viewer.scene.pick(click.position);
-        if (Cesium.defined(pickedObject) && pickedObject.id) {
-            showAircraftDetails(pickedObject.id);
+        // Use drillPick to get all objects at the click position (handling overlapping bracket/aircraft)
+        const pickedObjects = app.viewer.scene.drillPick(click.position);
+
+        if (Cesium.defined(pickedObjects) && pickedObjects.length > 0) {
+            // Find the first relevant entity (aircraft or airport)
+            // Skip the selection bracket if it's the top item
+            let targetEntity = null;
+
+            for (let i = 0; i < pickedObjects.length; i++) {
+                const picked = pickedObjects[i];
+                const entityId = (typeof picked.id === 'string') ? picked.id : (picked.id ? picked.id.id : null);
+
+                if (entityId === 'selection-bracket') {
+                    continue; // Skip the bracket itself
+                }
+
+                if (picked.id instanceof Cesium.Entity) {
+                    targetEntity = picked.id;
+                    break; // Found a valid entity
+                }
+            }
+
+            if (targetEntity) {
+                showAircraftDetails(targetEntity);
+            } else {
+                // Clicked only on bracket or something irrelevant? Deselect.
+                // Or maybe just do nothing if we clicked bracket? 
+                // Let's deselect only if we really found nothing relevant in the stack
+                // But actually, if we click 'nothing' (sky/ground), drillPick might be empty or contain non-entities.
+            }
+        } else {
+            // Clicked on empty space
+            document.getElementById('aircraftDetails')?.classList.add('hidden');
+            app.selectedAircraft = null;
+            if (app.selectionBracket) app.selectionBracket.show = false;
         }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
-    // Filter UI Listeners
-    // Detail Panel Buttons
-    document.getElementById('trackAircraft')?.addEventListener('click', () => {
-        if (app.selectedAircraft) startTracking(app.selectedAircraft);
-    });
-
-    document.getElementById('followAircraft')?.addEventListener('click', () => {
-        if (app.selectedAircraft) startFollowing(app.selectedAircraft);
-    });
-
-    // Camera Panel Buttons (Active when mode is running)
-    document.getElementById('cameraTrack')?.addEventListener('click', () => {
-        if (app.selectedAircraft) startTracking(app.selectedAircraft);
-    });
-
-    document.getElementById('cameraFollow')?.addEventListener('click', () => {
-        if (app.selectedAircraft) startFollowing(app.selectedAircraft);
-    });
-
-    document.getElementById('cameraCockpit')?.addEventListener('click', () => {
-        if (app.selectedAircraft) startCockpit(app.selectedAircraft);
-    });
-
-    // Overview button resets everything
-    document.getElementById('cameraOverview')?.addEventListener('click', () => {
-        // Stop all camera modes
+    // Aircraft Detail Action Buttons
+    document.getElementById('detailOverview')?.addEventListener('click', () => {
         stopCameraModes();
-
-        // Cancel any ongoing camera flights
+        setTraceVisibility(false);
         app.viewer.camera.cancelFlight();
-
-        // Force immediate camera reset using setView (no animation)
         app.viewer.camera.setView({
             destination: Cesium.Cartesian3.fromDegrees(27.43, 37.04, 200000),
             orientation: {
@@ -999,19 +1231,25 @@ function setupEventListeners() {
         });
     });
 
-    // Debug Toggle Button
-    document.getElementById('debugToggle')?.addEventListener('click', () => {
-        app.debugMode = !app.debugMode;
-        const debugPanel = document.getElementById('debugPanel');
-
-        if (app.debugMode) {
-            debugPanel?.classList.remove('hidden');
-            console.log('🔧 Debug Mode ENABLED - Use WASDQE keys to adjust aircraft position');
-        } else {
-            debugPanel?.classList.add('hidden');
-            console.log('🔧 Debug Mode DISABLED');
-        }
+    document.getElementById('detailTrack')?.addEventListener('click', () => {
+        if (app.selectedAircraft) startTracking(app.selectedAircraft);
     });
+
+    document.getElementById('detailFollow')?.addEventListener('click', () => {
+        if (app.selectedAircraft) startFollowing(app.selectedAircraft);
+    });
+
+    document.getElementById('detailGround')?.addEventListener('click', () => {
+        if (app.selectedAircraft) startGroundView(app.selectedAircraft);
+    });
+
+
+
+
+
+
+
+
 
     // Debug Panel - Close Button
     document.getElementById('closeDebug')?.addEventListener('click', () => {
@@ -1050,10 +1288,25 @@ function setupEventListeners() {
 
     // Keyboard Controls for Debug Mode
     document.addEventListener('keydown', (event) => {
+        const controlKeys = ['w', 'a', 's', 'd', 'q', 'e', 'W', 'A', 'S', 'D', 'Q', 'E'];
+
+        // Toggle Debug Mode with CTRL+SHIFT+ALT+D
+        if (event.ctrlKey && event.shiftKey && event.altKey && event.key.toLowerCase() === 'd') {
+            event.preventDefault();
+            app.debugMode = !app.debugMode;
+            const debugPanel = document.getElementById('debugPanel');
+            if (app.debugMode) {
+                debugPanel?.classList.remove('hidden');
+                console.log('🔧 Debug Mode ENABLED - Use WASDQE keys to adjust aircraft position');
+            } else {
+                debugPanel?.classList.add('hidden');
+                console.log('🔧 Debug Mode DISABLED');
+            }
+            return;
+        }
+
         if (!app.debugMode || !app.selectedAircraft) return;
 
-        // Prevent default behavior for our control keys
-        const controlKeys = ['w', 'a', 's', 'd', 'q', 'e', 'W', 'A', 'S', 'D', 'Q', 'E'];
         if (controlKeys.includes(event.key)) {
             event.preventDefault();
         }
@@ -1107,72 +1360,40 @@ function updateDebugUI() {
 }
 
 /**
+ * Set trace visibility
+ * @param {boolean} visible 
+ */
+function setTraceVisibility(visible) {
+    app.filters.showTraces = visible;
+    const toggleTraces = document.getElementById('toggleTraces');
+    if (toggleTraces) {
+        toggleTraces.classList.toggle('active', visible);
+    }
+    app.viewer?.scene?.requestRender();
+}
+
+/**
  * Setup Filter UI listeners
  */
 function setupFilterListeners() {
-    const minSlider = document.getElementById('altitudeMin');
-    const maxSlider = document.getElementById('altitudeMax');
-    const showAirports = document.getElementById('showAirports');
-    const showTraces = document.getElementById('showTraces');
-    const track = document.querySelector('.slider-track');
+    const toggleAirports = document.getElementById('toggleAirports');
+    const toggleTraces = document.getElementById('toggleTraces');
 
-    function updateSliderTrack() {
-        if (!minSlider || !maxSlider || !track) return;
-
-        const minVal = parseInt(minSlider.value);
-        const maxVal = parseInt(maxSlider.value);
-        const maxLimit = parseInt(maxSlider.max);
-
-        const minPercent = (minVal / maxLimit) * 100;
-        const maxPercent = (maxVal / maxLimit) * 100;
-
-        track.style.background = `linear-gradient(to right, 
-            rgba(0,0,0,0.5) ${minPercent}%, 
-            #00ff41 ${minPercent}%, 
-            #00ff41 ${maxPercent}%, 
-            rgba(0,0,0,0.5) ${maxPercent}%)`;
-    }
-
-    function handleSliderChange(e) {
-        let minVal = parseInt(minSlider.value);
-        let maxVal = parseInt(maxSlider.value);
-
-        // Prevent crossover
-        if (minVal > maxVal - 1000) {
-            if (e.target === minSlider) {
-                minSlider.value = maxVal - 1000;
-                minVal = maxVal - 1000;
-            } else {
-                maxSlider.value = minVal + 1000;
-                maxVal = minVal + 1000;
-            }
-        }
-
-        app.filters.minAltitude = minVal;
-        app.filters.maxAltitude = maxVal;
-
-        updateSliderTrack();
-
-        // Debounce updates slightly
-        if (app.filterTimeout) clearTimeout(app.filterTimeout);
-        app.filterTimeout = setTimeout(() => {
-            updateAircraftDisplay(); // Reprocess with new filters
-        }, 100);
-    }
-
-    minSlider?.addEventListener('input', handleSliderChange);
-    maxSlider?.addEventListener('input', handleSliderChange);
-
-    // Initial track update
-    updateSliderTrack();
-
-    showAirports?.addEventListener('change', (e) => {
-        app.filters.showAirports = e.target.checked;
+    toggleAirports?.addEventListener('click', () => {
+        app.filters.showAirports = !app.filters.showAirports;
+        toggleAirports.classList.toggle('active', app.filters.showAirports);
         renderAirports();
+
+        // Toggle Runway/Taxiway Overlay
+        const runwayDS = app.viewer.dataSources.getByName('airport-surfaces');
+        if (runwayDS && runwayDS.length > 0) {
+            runwayDS[0].show = app.filters.showAirports;
+        }
     });
 
-    showTraces?.addEventListener('change', (e) => {
-        app.filters.showTraces = e.target.checked;
+    toggleTraces?.addEventListener('click', () => {
+        app.filters.showTraces = !app.filters.showTraces;
+        toggleTraces.classList.toggle('active', app.filters.showTraces);
         // The CallbackProperty in entity.path.show will automatically pick this up
         // but we might need to request a render
         app.viewer.scene.requestRender();
@@ -1185,10 +1406,195 @@ function setupFilterListeners() {
 function handleSearch(event) {
     const query = event.target.value.trim().toUpperCase();
     app.searchQuery = query;
-    console.log('Search query:', query);
 
-    // Trigger display update immediately
-    updateAircraftDisplay();
+    // Clear existing timeout
+    if (app.searchTimeout) {
+        clearTimeout(app.searchTimeout);
+    }
+
+    if (!query) {
+        renderSearchResults([]);
+        updateAircraftDisplay();
+        return;
+    }
+
+    // Debounce search (300ms)
+    app.searchTimeout = setTimeout(async () => {
+        console.log('Searching for:', query);
+        const results = await performSearch(query);
+        renderSearchResults(results);
+        updateAircraftDisplay();
+    }, 300);
+}
+
+/**
+ * Perform search for cities, airports, and flights
+ */
+async function performSearch(query) {
+    if (!query || query.length < 2) return [];
+
+    const results = [];
+
+    // 1. Search Airports
+    const airportMatches = AIRPORTS.filter(a =>
+        a.name.toUpperCase().includes(query) ||
+        a.icao.toUpperCase().includes(query)
+    );
+    airportMatches.forEach(a => results.push({
+        type: 'AIRPORT',
+        label: `${a.icao} - ${a.name}`,
+        data: a,
+        id: `airport-${a.icao}`
+    }));
+
+    // 2. Search Flights (Currently tracked on map)
+    const entities = app.viewer.entities.values;
+    const aircraftMatches = entities.filter(e =>
+        e.properties && e.properties.type && e.properties.type.getValue() === 'aircraft' &&
+        (e.properties.callsign.getValue().toUpperCase().includes(query) || e.id.toUpperCase().includes(query))
+    );
+    aircraftMatches.forEach(e => results.push({
+        type: 'FLIGHT',
+        label: `${e.properties.callsign.getValue()} (${e.id})`,
+        data: e,
+        id: e.id
+    }));
+
+    // 3. Search Cities/Locations (via Geocoder)
+    try {
+        const geoResults = await app.geocoder.geocode(query);
+        if (geoResults && geoResults.length > 0) {
+            geoResults.forEach(res => results.push({
+                type: 'CITY',
+                label: res.displayName,
+                data: res,
+                id: `geo-${res.displayName}`
+            }));
+        }
+    } catch (error) {
+        console.error('Geocoder error:', error);
+    }
+
+    return results;
+}
+
+/**
+ * Render search results dropdown
+ */
+function renderSearchResults(results) {
+    const resultsContainer = document.getElementById('searchResults');
+    if (!resultsContainer) return;
+
+    if (results.length === 0) {
+        resultsContainer.innerHTML = '';
+        resultsContainer.style.display = 'none';
+        return;
+    }
+
+    resultsContainer.innerHTML = results.map(res => `
+        <div class="search-result-item" data-id="${res.id}">
+            <span class="result-type">[${res.type}]</span>
+            <span class="result-label">${res.label}</span>
+        </div>
+    `).join('');
+
+    resultsContainer.style.display = 'block';
+
+    // Add click listeners to results
+    resultsContainer.querySelectorAll('.search-result-item').forEach((item, index) => {
+        item.addEventListener('click', () => {
+            selectSearchResult(results[index]);
+        });
+    });
+}
+
+/**
+ * Handle selection of a search result
+ */
+function selectSearchResult(result) {
+    const { type, data, id } = result;
+    console.log('Selected search result:', result);
+
+    // Clear search
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+    renderSearchResults([]);
+    app.searchQuery = '';
+
+    if (type === 'CITY') {
+        app.viewer.camera.flyTo({
+            destination: data.destination,
+            duration: 3
+        });
+        updateStatus(`VIEWING: ${data.displayName.toUpperCase()}`);
+    } else if (type === 'AIRPORT') {
+        const entity = app.viewer.entities.getById(id);
+        if (entity) {
+            app.viewer.flyTo(entity, {
+                offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 25000),
+                duration: 3
+            });
+            showAircraftDetails(entity);
+        } else {
+            // Airport might not be in the collection or hidden
+            app.viewer.camera.flyTo({
+                destination: Cesium.Cartesian3.fromDegrees(data.lon, data.lat, 25000),
+                duration: 3
+            });
+        }
+    } else if (type === 'FLIGHT') {
+        const entity = app.viewer.entities.getById(id);
+        if (entity) {
+            app.viewer.camera.flyTo({
+                destination: entity.position.getValue(app.viewer.clock.currentTime),
+                offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-45), 5000),
+                duration: 3
+            });
+            showAircraftDetails(entity);
+        }
+    }
+}
+
+/**
+ * Get airliner name from callsign
+ */
+/**
+ * Get airliner name from callsign
+ */
+function getAirlinerFromCallsign(callsign) {
+    if (!callsign) return 'GENERAL AVIATION';
+    const code = callsign.substring(0, 3).trim();
+    return ICAO_AIRLINES[code]?.name || 'PRIVATE/CHARTER';
+}
+
+/**
+ * Get IATA flight number from ICAO callsign
+ * e.g., THY123 -> TK 123
+ */
+function getFlightNumberFromCallsign(callsign) {
+    if (!callsign) return '—';
+
+    // Extract 3-letter ICAO code
+    const icao = callsign.substring(0, 3).toUpperCase();
+
+    // Check if we have a mapping
+    if (ICAO_AIRLINES[icao]) {
+        const iata = ICAO_AIRLINES[icao].iata;
+        // Extract the flight number part (everything after the first 3 chars)
+        // Remove leading zeros for cleaner look (e.g. 009 -> 9)
+        let number = callsign.substring(3).trim();
+        number = number.replace(/^0+/, '');
+
+        return `${iata} ${number}`;
+    }
+
+    // Use fallback regex to separate letters and numbers if unknown airline
+    const match = callsign.match(/^([A-Z]+)(\d+.*)$/);
+    if (match) {
+        return `${match[1]} ${match[2]}`;
+    }
+
+    return callsign;
 }
 
 /**
@@ -1197,6 +1603,12 @@ function handleSearch(event) {
 function showAircraftDetails(entity) {
     app.selectedAircraft = entity;
 
+    // Show selection bracket
+    if (app.selectionBracket) {
+        app.selectionBracket.position = entity.position;
+        app.selectionBracket.show = true;
+    }
+
     const panel = document.getElementById('aircraftDetails');
     panel?.classList.remove('hidden');
 
@@ -1204,66 +1616,116 @@ function showAircraftDetails(entity) {
 
     // UI Elements
     const titleEl = document.querySelector('.panel-title');
-    const label1 = document.querySelectorAll('.data-label')[0];
-    const value1 = document.getElementById('detailCallsign');
-    const label2 = document.querySelectorAll('.data-label')[1];
-    const value2 = document.getElementById('detailAltitude');
-    const label3 = document.querySelectorAll('.data-label')[2];
-    const value3 = document.getElementById('detailVelocity');
-    const label4 = document.querySelectorAll('.data-label')[3];
-    const value4 = document.getElementById('detailHeading');
-    const label5 = document.querySelectorAll('.data-label')[4];
-    const value5 = document.getElementById('detailOrigin');
-    const followBtn = document.getElementById('followAircraft');
+    const labels = document.querySelectorAll('.data-label');
+    const values = document.querySelectorAll('.data-value');
+
+    // Mappings for easier access
+    const ui = {
+        airliner: document.getElementById('detailAirliner'),
+        flightNum: document.getElementById('detailFlightNum'),
+        callsign: document.getElementById('detailCallsign'),
+        altitude: document.getElementById('detailAltitude'),
+        velocity: document.getElementById('detailVelocity'),
+        heading: document.getElementById('detailHeading'),
+        origin: document.getElementById('detailOrigin')
+    };
 
     if (isAirport) {
         // Airport Mode
         titleEl.textContent = 'AIRPORT DATA';
 
-        label1.textContent = 'NAME:';
-        value1.textContent = entity.properties.name.getValue();
+        if (ui.airliner) ui.airliner.parentElement.style.display = 'none';
+        if (ui.flightNum) ui.flightNum.parentElement.style.display = 'none';
 
-        label2.textContent = 'ALTITUDE:';
-        value2.textContent = `${Math.round(entity.position.getValue(app.viewer.clock.currentTime).z)} M`;
+        labels[1].textContent = 'NAME:';         // Callsign (Index 1) -> NAME
+        ui.callsign.textContent = entity.properties.name.getValue();
 
-        label3.textContent = 'ICAO:';
-        value3.textContent = entity.properties.icao.getValue();
+        labels[3].textContent = 'ALTITUDE:';     // Altitude (Index 3) -> ALTITUDE
+        const airportPos = entity.position.getValue(app.viewer.clock.currentTime);
+        const cartographic = Cesium.Cartographic.fromCartesian(airportPos);
+        ui.altitude.textContent = `${Math.round(cartographic.height)} M`;
 
-        // Get lat/lon from cartesian
-        const cartographic = Cesium.Cartographic.fromCartesian(entity.position.getValue(app.viewer.clock.currentTime));
+        labels[4].textContent = 'ICAO:';         // Velocity (Index 4) -> ICAO
+        ui.velocity.textContent = entity.properties.icao.getValue();
 
-        label4.textContent = 'LAT:';
-        value4.textContent = Cesium.Math.toDegrees(cartographic.latitude).toFixed(4);
+        // Get lat/lon from cartographic
+        labels[5].textContent = 'LAT:';          // Heading (Index 5) -> LAT
+        ui.heading.textContent = Cesium.Math.toDegrees(cartographic.latitude).toFixed(4);
 
-        label5.textContent = 'LON:';
-        value5.textContent = Cesium.Math.toDegrees(cartographic.longitude).toFixed(4);
+        labels[6].textContent = 'LON:';          // Origin (Index 6) -> LON
+        ui.origin.textContent = Cesium.Math.toDegrees(cartographic.longitude).toFixed(4);
 
-        // Hide Follow button (can't follow static object comfortably/sensibly yet)
-        if (followBtn) followBtn.style.display = 'none';
+        // Hide Follow/Ground buttons
+        document.getElementById('detailFollow').style.display = 'none';
+        document.getElementById('detailGround').style.display = 'none';
 
     } else {
         // Aircraft Mode
         titleEl.textContent = 'AIRCRAFT DATA';
 
-        label1.textContent = 'CALLSIGN:';
-        value1.textContent = entity.properties.callsign || 'N/A';
+        // Show all rows
+        Object.values(ui).forEach(el => {
+            if (el) el.parentElement.style.display = 'flex';
+        });
 
-        label2.textContent = 'ALTITUDE:';
-        value2.textContent = `${entity.properties.altitude} FT`;
+        // 1. Clear Fields First (Prevent Stale Data)
+        ui.airliner.textContent = '...';
+        ui.flightNum.textContent = '...';
+        ui.callsign.textContent = '...';
+        ui.altitude.textContent = '...';
+        ui.velocity.textContent = '...';
+        ui.heading.textContent = '...';
+        ui.origin.textContent = '...';
 
-        label3.textContent = 'VELOCITY:';
-        value3.textContent = `${entity.properties.velocity} KTS`;
+        // 2. Populate Fresh Data
+        const callsign = entity.properties.callsign.getValue() || 'N/A';
+        ui.airliner.textContent = getAirlinerFromCallsign(callsign);
+        ui.flightNum.textContent = getFlightNumberFromCallsign(callsign);
+        ui.callsign.textContent = callsign;
 
-        label4.textContent = 'HEADING:';
-        value4.textContent = `${entity.properties.heading}°`;
+        labels[1].textContent = 'CALLSIGN:'; // Index 1
+        labels[3].textContent = 'ALTITUDE:'; // Index 3
+        labels[4].textContent = 'VELOCITY:'; // Index 4
+        labels[5].textContent = 'HEADING:';  // Index 5
+        labels[6].textContent = 'ORIGIN:';   // Index 6
 
-        label5.textContent = 'ORIGIN:';
-        value5.textContent = entity.properties.origin || 'N/A';
+        // Use precise current values if possible, otherwise fallback to property
+        const currentTime = app.viewer.clock.currentTime;
 
-        // Show Follow button
-        if (followBtn) followBtn.style.display = 'inline-block';
+        let altMeters = 0;
+        const position = entity.position.getValue(currentTime);
+        if (position) {
+            const carto = Cesium.Cartographic.fromCartesian(position);
+            altMeters = carto.height;
+        } else {
+            altMeters = entity.properties.altitude.getValue() || 0;
+        }
+
+        const altFeet = Math.round(altMeters * 3.28084);
+        ui.altitude.textContent = `${altFeet.toLocaleString()} FT`;
+
+        // Velocity
+        const vel = entity.properties.velocity.getValue();
+        ui.velocity.textContent = `${Math.round(vel)} KTS`;
+
+        // Heading
+        // Ideally get current heading from orientation, but property is fine for snapshot
+        const hdg = entity.properties.heading.getValue();
+        ui.heading.textContent = `${Math.round(hdg)}°`;
+
+        ui.origin.textContent = entity.properties.origin.getValue() || 'N/A';
+
+        // Show action buttons
+        document.getElementById('detailFollow').style.display = 'flex';
+        document.getElementById('detailGround').style.display = 'flex';
     }
 }
+
+// REMOVED: updateSelectedAircraftUI 
+// Real-time updates caused flickering and inconsistency. 
+// Data is now static snapshots upon selection.
+
+
 
 /**
  * Check if bounds have changed significantly
@@ -1341,7 +1803,7 @@ function startDataLoop() {
 function hideLoadingScreen() {
     const loadingScreen = document.getElementById('loadingScreen');
     if (loadingScreen) {
-        loadingScreen.classList.add('hidden');
+        loadingScreen.classList.add('fade-out');
         setTimeout(() => {
             loadingScreen.style.display = 'none';
         }, 500);
