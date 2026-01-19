@@ -5,15 +5,7 @@ export default defineConfig({
   base: '/SkyNeedle/',
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
-      external: ['cesium'],
-      output: {
-        globals: {
-          cesium: 'Cesium'
-        }
-      }
-    }
+    sourcemap: true
   },
   server: {
     port: 3000,

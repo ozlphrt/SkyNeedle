@@ -3,8 +3,6 @@
  * 3D Flight Tracking PWA
  */
 
-import * as Cesium from 'cesium';
-import 'cesium/Build/Cesium/Widgets/widgets.css';
 import { loadRunwaySurfaces } from './airportLoader.js';
 
 // Configuration - Using environment variables
