@@ -1,3 +1,5 @@
+import * as Cesium from 'cesium';
+
 /**
  * Fetch airport details JSON
  */

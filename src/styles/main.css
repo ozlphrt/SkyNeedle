@@ -107,12 +107,10 @@ body {
   gap: var(--spacing-md);
 }
 
-.app-title {
-  font-size: var(--font-size-xl);
-  font-weight: 700;
-  color: var(--color-primary);
-  text-shadow: var(--glow-primary);
-  letter-spacing: 4px;
+.app-logo {
+  height: 40px;
+  width: auto;
+  filter: drop-shadow(var(--glow-primary));
 }
 
 .app-status {
@@ -167,9 +165,12 @@ body {
 
 .search-panel {
   position: absolute;
-  top: var(--spacing-md);
-  right: var(--spacing-md);
-  width: 280px;
+  position: absolute;
+  bottom: var(--spacing-lg);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 320px;
+  /* Slightly wider */
   background: transparent;
   backdrop-filter: none;
   border: none;
@@ -206,8 +207,12 @@ body {
 }
 
 .search-results {
-  margin-top: var(--spacing-sm);
-  max-height: 400px;
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  margin-bottom: var(--spacing-sm);
+  max-height: 300px;
   overflow-y: auto;
   display: none;
   background: var(--bg-panel);
