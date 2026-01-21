@@ -33,6 +33,10 @@ jobs:
         
       - name: Build
         run: npm run build
+        env:
+          VITE_CESIUM_ION_TOKEN: ${{ secrets.VITE_CESIUM_ION_TOKEN }}
+          VITE_OPENSKY_USERNAME: ${{ secrets.VITE_OPENSKY_USERNAME }}
+          VITE_OPENSKY_PASSWORD: ${{ secrets.VITE_OPENSKY_PASSWORD }}
         
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
