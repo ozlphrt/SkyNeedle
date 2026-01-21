@@ -7,7 +7,7 @@
     "dev": "vite",
     "server": "node server.js",
     "dev:all": "start npm run server && npm run dev",
-    "build": "vite build",
+    "build": "vite build && node scripts/fix-build.js",
     "preview": "vite preview",
     "deploy": "npm run build && gh-pages -d dist"
   },
