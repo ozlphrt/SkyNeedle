@@ -122,11 +122,14 @@ async function initCesiumViewer() {
     console.log('Initializing Cesium viewer...');
 
     // Debug: Check if credentials are loaded
-    console.log('Environment check:', {
-        hasUsername: !!OPENSKY_USERNAME,
-        username: OPENSKY_USERNAME || '(not set)',
-        hasPassword: !!OPENSKY_PASSWORD
-    });
+    // Debug: Check if credentials are loaded
+    console.log('Environment check - OpenSky Username:', OPENSKY_USERNAME ? '✅ Set' : '❌ Missing');
+    console.log('Environment check - Cesium Token:', CESIUM_ION_TOKEN ? '✅ Set (' + CESIUM_ION_TOKEN.substring(0, 10) + '...)' : '❌ Missing');
+
+    if (!CESIUM_ION_TOKEN) {
+        console.error('CRITICAL: VITE_CESIUM_ION_TOKEN is missing. Map assets will fail to load (401 errors).');
+        updateStatus('CONFIG ERROR: MISSING API TOKEN', true);
+    }
 
     app.viewer = new Cesium.Viewer('cesiumContainer', {
         // Terrain and imagery
