@@ -5,14 +5,19 @@
 
 import * as Cesium from 'cesium';
 import 'cesium/Build/Cesium/Widgets/widgets.css';
-import { loadRunwaySurfaces } from './airportLoader.js';
-import { LARGE_AIRPORTS } from './data/airports_large.js';
+import { AirportManager } from './airportManager.js';
+import { AIRPORTS_BY_TIER, LARGE_AIRPORTS } from './data/airports_large.js';
 
-// Configuration - Using environment variables
-const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI3N2VmNjQ5YS00MzNiLTRjODUtYTYwMS1hZjIwOGM3YWFkMDUiLCJpZCI6MzgwMzQwLCJpYXQiOjE3Njg3NDA5ODB9.ILdx02CrRUguqA-msX6n5l9-NRFuF6oHPGtqlgabJB4';
+// API Configuration
+const CESIUM_ION_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || '';
 const OPENSKY_USERNAME = import.meta.env.VITE_OPENSKY_USERNAME || '';
 const OPENSKY_PASSWORD = import.meta.env.VITE_OPENSKY_PASSWORD || '';
-const MAX_AIRCRAFT_DISPLAY = 500; // Maximum number of aircraft to display at once
+
+// Display and Performance Configuration
+const MAX_AIRCRAFT_DISPLAY = 200; // Reduced from 500 for better performance
+const FAST_UPDATE_INTERVAL = 10000; // 10 seconds for selected/tracked aircraft
+const SLOW_UPDATE_INTERVAL = 30000; // 30 seconds for background aircraft
+const PREDICTION_WINDOW = 60; // Seconds to predict ahead
 
 // common ICAO airline codes for lookup
 // Airline Data with IATA Codes
@@ -64,21 +69,8 @@ const ICAO_AIRLINES = {
     'AVA': { name: 'Avianca', iata: 'AV' }
 };
 
-const AIRPORTS = [
-    { name: 'Istanbul Airport', icao: 'LTFM', lat: 41.275, lon: 28.751, alt: 99 },
-    { name: 'Sabiha Gokcen', icao: 'LTFJ', lat: 40.898, lon: 29.309, alt: 93 },
-    { name: 'Ankara Esenboga', icao: 'LTAC', lat: 40.128, lon: 32.995, alt: 953 },
-    { name: 'Izmir Adnan Menderes', icao: 'LTBJ', lat: 38.292, lon: 27.157, alt: 126 },
-    { name: 'Antalya Airport', icao: 'LTAI', lat: 36.899, lon: 30.801, alt: 54 },
-    { name: 'Milas-Bodrum', icao: 'LTFE', lat: 37.250, lon: 27.664, alt: 6 },
-    { name: 'Dalaman Airport', icao: 'LTBS', lat: 36.716, lon: 28.791, alt: 6 },
-    { name: 'Adana Sakirpasa', icao: 'LTAF', lat: 36.982, lon: 35.280, alt: 20 },
-    { name: 'Trabzon Airport', icao: 'LTCG', lat: 40.995, lon: 39.789, alt: 31 },
-    { name: 'JFK International', icao: 'KJFK', lat: 40.645, lon: -73.785, alt: 10 },
-    { name: 'Heathrow Airport', icao: 'EGLL', lat: 51.470, lon: -0.454, alt: 25 },
-    { name: 'Frankfurt Airport', icao: 'EDDF', lat: 50.037, lon: 8.562, alt: 111 },
-    { name: 'Dubai International', icao: 'OMDB', lat: 25.253, lon: 55.365, alt: 19 }
-];
+// Flatten all tiers into a single array for searching
+const AIRPORTS = Object.values(AIRPORTS_BY_TIER).flat();
 
 // Set Cesium Ion token
 Cesium.Ion.defaultAccessToken = CESIUM_ION_TOKEN;
@@ -98,8 +90,15 @@ const app = {
     },
     searchQuery: '', // Search query string
     trackedEntity: null,
-    followMode: 'NONE', // 'NONE', 'TRACK', 'FOLLOW', 'COCKPIT'
+    followMode: 'NONE', // 'NONE', 'TRACK', 'FOLLOW', 'COCKPIT', 'OVERVIEW'
     geocoder: null, // Geocoder service
+    overviewMode: {
+        active: false,
+        mouseX: 0.5, // Normalized 0-1, 0.5 is center
+        mouseY: 0.5, // Normalized 0-1, 0.5 is center
+        targetPosition: null, // Target position for overview
+        baseAltitude: 500000 // Base altitude for overview (500km)
+    },
     searchTimeout: null, // Timeout for debouncing search
     // Debug mode for manual alignment
     debugMode: false,
@@ -110,7 +109,10 @@ const app = {
     },
     selectionBracket: null, // Selection bracket entity
     statusLocked: false, // Prevent status updates when locked (for error persistence)
-    statusLockTimeout: null // Timeout for unlocking status
+    statusLockTimeout: null, // Timeout for unlocking status
+    aircraftLastUpdate: new Map(), // Track when each aircraft was last updated (for stale detection)
+    lastBackgroundUpdate: 0, // Track last time background aircraft were updated (for adaptive rate)
+    airportManager: null // Centralized airport manager
 };
 
 /**
@@ -157,27 +159,35 @@ async function initCesiumViewer() {
         // Performance
         // Performance - requestRenderMode disabled for smoother animations of moving objects
         requestRenderMode: false,
-        maximumRenderTimeChange: Infinity
+        maximumRenderTimeChange: Infinity,
+        orderIndependentTranslucency: false // Disable OIT to prevent weird transparency artifacts
     });
 
-    // Configure Camera Controller for Smoother, "Heavier" Feel
+    // SIMPLE CAMERA CONTROLLER - Minimal settings for smooth control
     const controller = app.viewer.scene.screenSpaceCameraController;
-    controller.enableCollisionDetection = true;
 
-    // Increase inertia to add "weight" to camera movements
-    controller.inertiaSpin = 0.95;
-    controller.inertiaTranslate = 0.95;
-    controller.inertiaZoom = 0.95;
+    // Disable default controller and rebuild with minimal settings
+    controller.enableRotate = true;
+    controller.enableTranslate = true;
+    controller.enableZoom = true;
+    controller.enableTilt = true;
+    controller.enableLook = false;
 
-    // Smoother zoom responses
-    controller.zoomEventTypes = [
-        Cesium.CameraEventType.MIDDLE_DRAG,
-        Cesium.CameraEventType.WHEEL,
-        Cesium.CameraEventType.PINCH
-    ];
-    controller.zoomFactor = 3.0; // Less jumpy zoom (default is 5.0)
-    controller.minimumZoomDistance = 50; // Prevent clipping into ground models
+    // CRITICAL: These are the actual sensitivity controls
+    // Higher inertia = smoother, more momentum (buttery feel)
+    // Lower inertia = more responsive but jittery
+    controller.inertiaSpin = 0.95;      // High for smooth rotation
+    controller.inertiaTranslate = 0.95; // High for smooth panning
+    controller.inertiaZoom = 0.9;       // High for smooth zoom
+
+    // Zoom speed - HIGHER number = SLOWER zoom
+    controller.zoomFactor = 10.0; // Very high = very slow zoom
+
+    // Distance limits
+    controller.minimumZoomDistance = 50;
     controller.maximumZoomDistance = 30000000;
+
+    console.log('🎮 Buttery smooth camera controls - inertia: 0.95, zoom factor: 10.0');
 
     // Ensure animation is enabled for aircraft movement
     app.viewer.clock.shouldAnimate = true;
@@ -188,6 +198,86 @@ async function initCesiumViewer() {
     scene.globe.baseColor = Cesium.Color.fromCssColorString('#0a0e14');
     scene.backgroundColor = Cesium.Color.fromCssColorString('#000000');
     scene.globe.enableLighting = false; // Disable sun lighting on globe
+    scene.globe.depthTestAgainstTerrain = true; // Enable depth testing to prevent "floating" markers parallax
+
+    // Ensure globe is opaque
+    scene.globe.translucency.enabled = false;
+    scene.globe.baseColor = Cesium.Color.BLACK; // Ensure no transparency in base color
+
+    // CUSTOM INPUT DAMPENING - Intercept mouse/touch events and reduce sensitivity
+    const canvas = app.viewer.canvas;
+    const SENSITIVITY_REDUCTION = 0.3; // Reduce input by 70%
+
+    // Store original event handlers
+    const originalHandlers = {
+        mousedown: null,
+        mousemove: null,
+        wheel: null,
+        touchstart: null,
+        touchmove: null
+    };
+
+    // Dampening wrapper for mouse movement
+    let lastMouseX = 0;
+    let lastMouseY = 0;
+
+    canvas.addEventListener('mousedown', (e) => {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    }, true);
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (e.buttons > 0) { // Only dampen when dragging
+            const deltaX = e.clientX - lastMouseX;
+            const deltaY = e.clientY - lastMouseY;
+
+            // Reduce the movement
+            const dampedDeltaX = deltaX * SENSITIVITY_REDUCTION;
+            const dampedDeltaY = deltaY * SENSITIVITY_REDUCTION;
+
+            // Update last position with dampened values
+            lastMouseX = e.clientX - (deltaX - dampedDeltaX);
+            lastMouseY = e.clientY - (deltaY - dampedDeltaY);
+
+            // Modify the event
+            Object.defineProperty(e, 'movementX', { value: dampedDeltaX, writable: false });
+            Object.defineProperty(e, 'movementY', { value: dampedDeltaY, writable: false });
+        }
+    }, true);
+
+    // Dampen wheel zoom
+    canvas.addEventListener('wheel', (e) => {
+        // Reduce wheel delta
+        Object.defineProperty(e, 'deltaY', {
+            value: e.deltaY * SENSITIVITY_REDUCTION,
+            writable: false
+        });
+    }, true);
+
+    // Dampen touch movement
+    let lastTouchX = 0;
+    let lastTouchY = 0;
+
+    canvas.addEventListener('touchstart', (e) => {
+        if (e.touches.length > 0) {
+            lastTouchX = e.touches[0].clientX;
+            lastTouchY = e.touches[0].clientY;
+        }
+    }, true);
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (e.touches.length > 0) {
+            const touch = e.touches[0];
+            const deltaX = touch.clientX - lastTouchX;
+            const deltaY = touch.clientY - lastTouchY;
+
+            // Update with dampened movement
+            lastTouchX = touch.clientX - (deltaX * (1 - SENSITIVITY_REDUCTION));
+            lastTouchY = touch.clientY - (deltaY * (1 - SENSITIVITY_REDUCTION));
+        }
+    }, true);
+
+    console.log('🎮 Custom input dampening enabled - sensitivity reduced by 70%');
 
     // Initialize Geocoder Service (Now with scene reference)
     app.geocoder = new Cesium.IonGeocoderService({ scene: scene });
@@ -214,11 +304,19 @@ async function initCesiumViewer() {
     // Initialize Selection Bracket
     createSelectionBracket();
 
-    // Initialize Airports
-    initializeAirports();
+    // Initialize Airport Manager
+    app.airportManager = new AirportManager(app.viewer, app.filters);
 
-    // Load Runway and Taxiway Details
-    loadRunwaySurfaces(app.viewer, app);
+    // Load tiered airport markers
+    app.airportManager.loadAirports(AIRPORTS_BY_TIER);
+
+    // Fetch and load detailed surfaces (Runways/Taxiways)
+    fetch(`${import.meta.env.BASE_URL}assets/airport_details.json`)
+        .then(res => res.json())
+        .then(data => {
+            app.airportManager.loadSurfaces(data);
+        })
+        .catch(err => console.error('Failed to load airport details:', err));
 
     // REMOVED: Real-time UI updates (per user request to fix inconsistencies)
     // app.viewer.scene.preUpdate.addEventListener(updateSelectedAircraftUI);
@@ -226,70 +324,7 @@ async function initCesiumViewer() {
     console.log('Cesium viewer initialized');
 }
 
-/**
- * Load and render runway/taxiway surfaces
- */
-async function loadRunwaySurfaces_OLD() {
-    console.log('Loading airport details...');
-    try {
-        const response = await fetch(`${import.meta.env.BASE_URL}assets/airport_details.json`);
-        if (!response.ok) throw new Error('Failed to load airport details');
 
-        const data = await response.json();
-
-        // Create a data source for airport surfaces
-        const dataSource = new Cesium.CustomDataSource('airport-surfaces');
-        app.viewer.dataSources.add(dataSource);
-
-        Object.entries(data).forEach(([icao, details]) => {
-            // Render Runways
-            if (details.runways) {
-                details.runways.forEach(feature => {
-                    const diffCoords = feature.geometry.coordinates;
-                    // Flatten coordinates for Cesium
-                    const positions = diffCoords.flat();
-
-                    dataSource.entities.add({
-                        show: new Cesium.CallbackProperty(() => app.filters.showAirports, false),
-                        corridor: {
-                            positions: Cesium.Cartesian3.fromDegreesArray(positions),
-                            width: 45.0, // 45 meters wide
-                            material: Cesium.Color.fromCssColorString('#00ff41').withAlpha(0.3), // Cyber Green
-                            cornerType: Cesium.CornerType.MITERED,
-                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-                            // Only show when camera is relatively close
-                            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
-                        }
-                    });
-                });
-            }
-
-            // Render Taxiways
-            if (details.taxiways) {
-                details.taxiways.forEach(feature => {
-                    const diffCoords = feature.geometry.coordinates;
-                    const positions = diffCoords.flat();
-
-                    dataSource.entities.add({
-                        corridor: {
-                            positions: Cesium.Cartesian3.fromDegreesArray(positions),
-                            width: 20.0, // 20 meters wide
-                            material: Cesium.Color.fromCssColorString('#00ff41').withAlpha(0.15), // Fainter Green
-                            cornerType: Cesium.CornerType.ROUNDED,
-                            heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-                            distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 200000)
-                        }
-                    });
-                });
-            }
-        });
-
-        console.log('✅ Airport surfaces loaded');
-
-    } catch (error) {
-        console.error('❌ Error loading airport details:', error);
-    }
-}
 
 /**
  * Create custom selection bracket entity
@@ -351,58 +386,6 @@ function createSelectionBracket() {
             disableDepthTestDistance: Number.POSITIVE_INFINITY, // Always on top
             pixelOffset: new Cesium.Cartesian2(0, 0)
         }
-    });
-}
-
-/**
- * Initialize Airport Markers
- * @param {Array<string>} hiddenIcaos - List of airport ICAOs to hide (because they have detailed surfaces)
- */
-function initializeAirports(hiddenIcaos = []) {
-    if (!app.viewer) return;
-
-    const pinBuilder = new Cesium.PinBuilder();
-
-    AIRPORTS.forEach(airport => {
-        // Check if this airport has detailed surfaces (should be hidden)
-        const shouldHideVisuals = hiddenIcaos.includes(airport.icao);
-
-        const entityOptions = {
-            id: `airport-${airport.icao}`,
-            position: Cesium.Cartesian3.fromDegrees(airport.lon, airport.lat, airport.alt),
-            properties: {
-                type: 'airport',
-                name: airport.name,
-                icao: airport.icao
-            }
-        };
-
-        // Only add visuals if NOT in the hidden list
-        if (!shouldHideVisuals) {
-            entityOptions.point = {
-                pixelSize: 8,
-                color: Cesium.Color.WHITE.withAlpha(0.8),
-                outlineColor: Cesium.Color.BLACK,
-                outlineWidth: 1,
-                heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
-                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false),
-                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 5000000) // Show from further away
-            };
-            entityOptions.label = {
-                text: airport.name,
-                font: '12px Inter, sans-serif', // Cleaner font
-                style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                fillColor: Cesium.Color.WHITE,
-                outlineColor: Cesium.Color.BLACK,
-                outlineWidth: 2,
-                verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
-                pixelOffset: new Cesium.Cartesian2(0, -10), // Above the dot
-                distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 500000), // Hide labels when zoomed out
-                show: new Cesium.CallbackProperty(() => app.filters.showAirports, false)
-            };
-        }
-
-        app.viewer.entities.add(entityOptions);
     });
 }
 
@@ -778,6 +761,9 @@ function updateAircraftDisplay(aircraftData) {
         currentIds.add(id);
         currentIds.add(trackId);
 
+        // Track when this aircraft was last updated
+        app.aircraftLastUpdate.set(id, Date.now());
+
         const altitude = (baro_altitude || geo_altitude || 0);
         const velocityMs = (velocity || 0) * 0.51444;
         const verticalRateMs = (vertical_rate || 0); // OpenSky vertical_rate is already in m/s
@@ -989,7 +975,49 @@ function updateAircraftDisplay(aircraftData) {
             continue;
         }
 
+        // IMPORTANT: Don't remove selected or tracked aircraft even if they're not in the current API response
+        // This prevents the aircraft from disappearing when:
+        // 1. Following/tracking an aircraft that moves out of viewport
+        // 2. API temporarily doesn't return the aircraft
+        // 3. User is in a camera mode focused on this aircraft
+        const isSelected = app.selectedAircraft && entity.id === app.selectedAircraft.id;
+        const isTracked = app.trackedEntity && entity.id === app.trackedEntity.id;
+
+        if (isSelected || isTracked) {
+            // Check if this aircraft is truly stale (not updated in 5 minutes = likely landed or signal lost)
+            const lastUpdate = app.aircraftLastUpdate.get(entity.id);
+            const now = Date.now();
+            const STALE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
+            if (lastUpdate && (now - lastUpdate) > STALE_THRESHOLD) {
+                console.warn(`⚠️ Removing stale aircraft: ${entity.id} (not updated for ${Math.round((now - lastUpdate) / 1000)}s)`);
+
+                // Clear selection/tracking if this is the stale aircraft
+                if (isSelected) {
+                    app.selectedAircraft = null;
+                    document.getElementById('aircraftDetails')?.classList.add('hidden');
+                    if (app.selectionBracket) app.selectionBracket.show = false;
+                }
+                if (isTracked) {
+                    stopCameraModes();
+                }
+
+                app.aircraftLastUpdate.delete(entity.id);
+                entities.remove(entity);
+            } else {
+                // Preserve this aircraft
+                if (isSelected) {
+                    console.log(`⭐ Preserving selected aircraft: ${entity.id}`);
+                }
+                if (isTracked) {
+                    console.log(`🎯 Preserving tracked aircraft: ${entity.id}`);
+                }
+            }
+            continue;
+        }
+
         if (!currentIds.has(entity.id)) {
+            app.aircraftLastUpdate.delete(entity.id);
             entities.remove(entity);
         }
     }
@@ -1080,6 +1108,32 @@ function updateCamera() {
                 up: Cesium.Cartesian3.normalize(app.groundCameraPos, new Cesium.Cartesian3())
             }
         });
+    } else if (app.followMode === 'COCKPIT') {
+        // First-person cockpit view
+
+        // Get heading from aircraft orientation
+        let heading = 0;
+        const orientation = entity.orientation ? entity.orientation.getValue(app.viewer.clock.currentTime) : null;
+
+        if (orientation) {
+            heading = Cesium.HeadingPitchRoll.fromQuaternion(orientation).heading;
+        } else {
+            heading = Cesium.Math.toRadians(entity.properties.heading.getValue() || 0);
+        }
+
+        // Release tracked entity if set
+        if (app.viewer.trackedEntity) {
+            app.viewer.trackedEntity = undefined;
+        }
+
+        // Position camera at aircraft location, looking forward
+        const headingPitchRange = new Cesium.HeadingPitchRange(
+            heading,
+            Cesium.Math.toRadians(0), // Level horizon
+            5 // Very close to aircraft (5 meters)
+        );
+
+        app.viewer.camera.lookAt(position, headingPitchRange);
     }
 }
 
@@ -1090,6 +1144,12 @@ function stopCameraModes() {
     app.followMode = 'NONE';
     app.trackedEntity = null;
     app.viewer.trackedEntity = undefined;
+
+    // Reset overview mode
+    app.overviewMode.active = false;
+    app.overviewMode.mouseX = 0.5;
+    app.overviewMode.mouseY = 0.5;
+    app.overviewMode.targetPosition = null;
 
     // Release camera from lookAt
     app.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
@@ -1110,15 +1170,17 @@ function startTracking(entity) {
 
     app.trackedEntity = entity;
     updateStatus(`TRACKING ${entity.properties.callsign || entity.id}`);
-    setTraceVisibility(true);
+    // FIX: Use TRANSITION mode to prevent updateCamera from interfering with flyTo
+    app.followMode = 'TRANSITION';
 
-    // Smoothly fly to the tracking position first
+    // Smoothly transition to the tracking offset
     app.viewer.flyTo(entity, {
-        duration: 4.0, // Slower, smoother transition
+        duration: 3.0, // Smooth transition
         offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-20), 2000),
-        easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+        easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT
     }).then(() => {
-        // Only lock if we are still in tracking intent (user might have clicked away)
+        // Flight complete - now lock the camera
+        // Only engage if we're still interested in this entity
         if (app.trackedEntity === entity) {
             app.followMode = 'TRACK';
             app.viewer.trackedEntity = entity;
@@ -1195,9 +1257,39 @@ function startGroundView(entity) {
     updateStatus(`GROUND VIEW: ${entity.properties.callsign || entity.id}`);
 }
 
+
 /**
- * Start cockpit view
+ * Start cockpit view (First-person from aircraft)
  */
+function startCockpitView(entity) {
+    if (!entity) return;
+
+    const position = entity.position.getValue(app.viewer.clock.currentTime);
+    if (!position) return;
+
+    // Stop any existing tracking/locking
+    app.viewer.trackedEntity = undefined;
+    app.viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+    app.viewer.camera.cancelFlight();
+
+    app.trackedEntity = entity;
+    app.followMode = 'COCKPIT';
+
+    updateStatus(`COCKPIT VIEW: ${entity.properties.callsign || entity.id}`);
+
+    // Smoothly fly to cockpit position first
+    app.viewer.flyTo(entity, {
+        duration: 3.0,
+        offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(0), 10), // Very close
+        easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+    }).then(() => {
+        if (app.trackedEntity === entity) {
+            // Cockpit mode will be handled in updateCamera()
+            console.log('🛩️ Cockpit view activated');
+        }
+    });
+}
+
 
 
 
@@ -1258,6 +1350,9 @@ function setupEventListeners() {
             document.getElementById('aircraftDetails')?.classList.add('hidden');
             app.selectedAircraft = null;
             if (app.selectionBracket) app.selectionBracket.show = false;
+
+            // Resume to main original state (stop tracking)
+            stopCameraModes();
         }
     }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
@@ -1268,26 +1363,38 @@ function setupEventListeners() {
         app.viewer.camera.cancelFlight();
 
         if (app.selectedAircraft) {
-            // If aircraft is selected, TRACK it from above
+            // OVERVIEW MODE: Standard tracking with high altitude and tilted offset
             const entity = app.selectedAircraft;
-            app.trackedEntity = entity; // Mark as tracked so we don't garbage collect it or lose context
 
-            // We use flyTo with a high offset to simulate "Overview" but keep the target moving in view
+            // Stop any existing mode first
+            stopCameraModes();
+
+            app.selectedAircraft = entity;
+            app.trackedEntity = entity;
+            app.followMode = 'TRACK'; // Use standard TRACK mode but with specific offset
+
+            // Set simple camera controller to be buttery smooth
+            app.viewer.scene.screenSpaceCameraController.inertiaSpin = 0.95;
+            app.viewer.scene.screenSpaceCameraController.inertiaTranslate = 0.95;
+            app.viewer.scene.screenSpaceCameraController.inertiaZoom = 0.95;
+
+            // Fly to the overview position with tilted horizon
+            // Using flyTo with offset sets the view relative to the entity AND sets the trackedEntity
             app.viewer.flyTo(entity, {
-                duration: 4.0,
-                offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-90), 50000), // 50km straight down
-                easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
-            }).then(() => {
-                // Determine if we want to "lock" this view
-                // For now, we engage 'TRACK' mode but from high up? 
-                // Or just leave it floating?
-                // Engaging track mode with this offset might be nice.
-                if (app.trackedEntity === entity) {
-                    app.followMode = 'TRACK';
-                    app.viewer.trackedEntity = entity;
-                }
+                duration: 2.0,
+                offset: new Cesium.HeadingPitchRange(
+                    0, // Heading (will be relative to aircraft if we don't lookAt)
+                    Cesium.Math.toRadians(-45), // 45 degree tilt
+                    app.overviewMode.baseAltitude // 500km range
+                ),
+                easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT
             });
-            updateStatus(`OVERVIEW: ${entity.properties.callsign || entity.id}`);
+
+            // We set trackedEntity immediately so Cesium knwos to track it
+            // flyTo will animate to the correct offset
+            app.viewer.trackedEntity = entity;
+
+            updateStatus(`OVERVIEW: ${entity.properties.callsign || entity.id} - Drag to orbit`);
 
         } else {
             // General Map Overview (No selection)
@@ -1302,8 +1409,8 @@ function setupEventListeners() {
                     pitch: -Cesium.Math.PI_OVER_TWO,
                     roll: 0.0
                 },
-                duration: 4.0,
-                easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT
+                duration: 3.0,
+                easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT
             });
             updateStatus('MAP OVERVIEW');
         }
@@ -1320,6 +1427,11 @@ function setupEventListeners() {
     document.getElementById('detailGround')?.addEventListener('click', () => {
         if (app.selectedAircraft) startGroundView(app.selectedAircraft);
     });
+
+    document.getElementById('detailCockpit')?.addEventListener('click', () => {
+        if (app.selectedAircraft) startCockpitView(app.selectedAircraft);
+    });
+
 
 
 
@@ -1684,7 +1796,13 @@ function selectSearchResult(result) {
             }
         });
     } else if (type === 'AIRPORT') {
-        const entity = app.viewer.entities.getById(id);
+        let entity = app.viewer.entities.getById(id);
+
+        // If not in main entities, check the AirportManager's datasource
+        if (!entity && app.airportManager && app.airportManager.dataSource) {
+            entity = app.airportManager.dataSource.entities.getById(id);
+        }
+
         if (entity) {
             app.viewer.flyTo(entity, {
                 // Increased distance and Pitch adjusted for better context
@@ -1951,23 +2069,59 @@ function setupCameraListener() {
 }
 
 /**
- * Start data update loop
+ * Start data update loop with adaptive refresh rates
+ * - Fast updates (10s) for selected/tracked aircraft
+ * - Slow updates (30s) for all aircraft when nothing is selected
  */
 function startDataLoop() {
     // Initial fetch
     refreshAircraftData();
 
-    // Update every 30 seconds to stay within OpenSky rate limits
-    // With 4000 credits/day: 4000 ÷ 24 hours = ~166 requests/hour = ~2880 requests/day (safe buffer)
-    // 30 seconds = 2 requests/minute = 120 requests/hour = 2880 requests/day ✅
-    // Recursive update loop to prevent request stacking
-    // Update every 10 seconds (aggressive for smoother tracking)
+    // Adaptive update loop
     const loop = async () => {
         if (!app.viewer || app.viewer.isDestroyed()) return;
-        await refreshAircraftData();
-        app.updateInterval = setTimeout(loop, 10000);
+
+        const now = Date.now();
+        const timeSinceBackgroundUpdate = now - app.lastBackgroundUpdate;
+
+        // Determine if we need a background update (all aircraft)
+        const needsBackgroundUpdate = timeSinceBackgroundUpdate >= SLOW_UPDATE_INTERVAL;
+
+        // Always update if we have selected/tracked aircraft OR if it's time for background update
+        const hasActiveTracking = app.selectedAircraft || app.trackedEntity;
+
+        if (hasActiveTracking || needsBackgroundUpdate) {
+            await refreshAircraftData();
+
+            // Update background timestamp only if we did a full update
+            if (needsBackgroundUpdate) {
+                app.lastBackgroundUpdate = now;
+                console.log('🔄 Background aircraft update (30s cycle)');
+            } else {
+                console.log('⚡ Fast update for selected/tracked aircraft (10s cycle)');
+            }
+        }
+
+        // Schedule next update based on whether we have active tracking
+        const nextInterval = hasActiveTracking ? FAST_UPDATE_INTERVAL : SLOW_UPDATE_INTERVAL;
+        app.updateInterval = setTimeout(loop, nextInterval);
     };
+
+    // Initialize background update timestamp
+    app.lastBackgroundUpdate = Date.now();
+
+    // Start the loop
     loop();
+
+    // Listen for tracked entity changes (e.g. user unselects)
+    app.viewer.trackedEntityChanged.addEventListener(() => {
+        if (!app.viewer.trackedEntity) {
+            // User likely clicked away or stopped tracking
+            if (app.followMode === 'TRACK') {
+                stopCameraModes();
+            }
+        }
+    });
 
     // Setup camera movement listener for immediate updates when navigating
     setupCameraListener();
@@ -2033,59 +2187,7 @@ function hideLoadingScreen() {
     }
 }
 
-/**
- * Render airports based on visibility filter
- */
-function renderAirports() {
-    if (!app.viewer) return;
 
-    // Clear existing airports first (to avoid duplicates or update style)
-    // We'll use a specific ID prefix or manage a collection
-    // Simple approach: Use entities with a specific property
-
-    // Actually, improved approach: Create them once, and just toggle 'show'
-
-    const entities = app.viewer.entities.values;
-    const airportEntities = entities.filter(e => e.properties && e.properties.type && e.properties.type.getValue() === 'airport');
-
-    if (airportEntities.length === 0 && app.filters.showAirports) {
-        // Create airports if they don't exist and we want to show them
-        AIRPORTS.forEach(airport => {
-            app.viewer.entities.add({
-                position: Cesium.Cartesian3.fromDegrees(airport.lon, airport.lat, airport.alt),
-                point: {
-                    pixelSize: 10,
-                    color: Cesium.Color.fromCssColorString('#00ff41').withAlpha(0.6),
-                    outlineColor: Cesium.Color.BLACK,
-                    outlineWidth: 2,
-                    disableDepthTestDistance: Number.POSITIVE_INFINITY
-                },
-                label: {
-                    text: airport.name, // Display Name
-                    font: '10px JetBrains Mono',
-                    style: Cesium.LabelStyle.FILL_AND_OUTLINE,
-                    fillColor: Cesium.Color.fromCssColorString('#00ff41'),
-                    outlineColor: Cesium.Color.BLACK,
-                    outlineWidth: 2,
-                    verticalOrigin: Cesium.VerticalOrigin.TOP,
-                    pixelOffset: new Cesium.Cartesian2(0, 10),
-                    distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 100000), // Only show labels when close
-                    disableDepthTestDistance: Number.POSITIVE_INFINITY
-                },
-                properties: {
-                    type: 'airport',
-                    name: airport.name,
-                    icao: airport.icao
-                }
-            });
-        });
-    } else {
-        // Update visibility
-        airportEntities.forEach(entity => {
-            entity.show = app.filters.showAirports;
-        });
-    }
-}
 
 /**
  * Initialize application
@@ -2100,9 +2202,6 @@ async function init() {
         // Setup UI
         setupEventListeners();
 
-        // Initial render of airports
-        renderAirports();
-
         // Start data updates
         startDataLoop();
 
@@ -2112,8 +2211,10 @@ async function init() {
 
 
     } catch (error) {
-        console.error('Initialization error:', error);
-        updateStatus('INITIALIZATION FAILED', true);
+        console.error('❌ Initialization error:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+        updateStatus('INITIALIZATION FAILED - Check console for details', true);
     }
 }
 

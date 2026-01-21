@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkyNeedle - Airport Marker Concepts</title>
+    <style>
+        body {
+            background-color: #0a0e14;
+            color: #e0e0e0;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px;
+            margin: 0;
+        }
+
+        h1 {
+            color: #00ff41;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            width: 100%;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #00ff41;
+            background: rgba(0, 255, 65, 0.05);
+        }
+
+        canvas {
+            margin: 20px 0;
+            /* Border to show the bounds of the 64x64 texture */
+            border: 1px dashed rgba(255, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        p {
+            font-size: 0.9rem;
+            color: #888;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .render-context {
+            font-size: 0.8rem;
+            color: #00ff41;
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Airport Marker Concepts</h1>
+    <div class="render-context">Running on 64x64 canvases (Native Texture Size)</div>
+
+    <div class="grid">
+        <!-- CONCEPT 1 -->
+        <div class="card">
+            <h3>1. The "Bullseye"</h3>
+            <canvas id="c1" width="64" height="64"></canvas>
+            <p>High contrast concentric rings. Classic, readable, military aesthetic.</p>
+        </div>
+
+        <!-- CONCEPT 2 -->
+        <div class="card">
+            <h3>2. The "Beacon"</h3>
+            <canvas id="c2" width="64" height="64"></canvas>
+            <p>Glowing core with a fading radar pulse effect.</p>
+        </div>
+
+        <!-- CONCEPT 3 -->
+        <div class="card">
+            <h3>3. The "Hex-Node"</h3>
+            <canvas id="c3" width="64" height="64"></canvas>
+            <p>Sci-fi hexagonal structure. Fits the "Tech" theme perfectly.</p>
+        </div>
+
+        <!-- CONCEPT 4 -->
+        <div class="card">
+            <h3>4. The "Bracket"</h3>
+            <canvas id="c4" width="64" height="64"></canvas>
+            <p>Framing corners that imply a zone rather than a single point.</p>
+        </div>
+
+        <!-- CONCEPT 5 -->
+        <div class="card">
+            <h3>5. The "Diamond"</h3>
+            <canvas id="c5" width="64" height="64"></canvas>
+            <p>Sharp, precision diamond shape typically used for navigation waypoints.</p>
+        </div>
+    </div>
+
+    <script>
+        const colorMain = '#00ff41'; // Cyber Green
+        const colorWhite = '#ffffff';
+        const colorBg = '#0a0e14';
+
+        function draw1() {
+            const ctx = document.getElementById('c1').getContext('2d');
+            const cx = 32, cy = 32;
+
+            // Outer Ring
+            ctx.beginPath();
+            ctx.arc(cx, cy, 14, 0, Math.PI * 2);
+            ctx.strokeStyle = colorMain;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner Dot
+            ctx.beginPath();
+            ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = colorWhite;
+            ctx.fill();
+
+            // Crosshairs
+            ctx.beginPath();
+            ctx.moveTo(cx - 20, cy); ctx.lineTo(cx - 10, cy);
+            ctx.moveTo(cx + 20, cy); ctx.lineTo(cx + 10, cy);
+            ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy - 10);
+            ctx.moveTo(cx, cy + 20); ctx.lineTo(cx, cy + 10);
+            ctx.strokeStyle = colorMain;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function draw2() {
+            const ctx = document.getElementById('c2').getContext('2d');
+            const cx = 32, cy = 32;
+
+            // Glow gradient
+            const grad = ctx.createRadialGradient(cx, cy, 2, cx, cy, 24);
+            grad.addColorStop(0, 'rgba(0, 255, 65, 1)');
+            grad.addColorStop(0.4, 'rgba(0, 255, 65, 0.3)');
+            grad.addColorStop(1, 'rgba(0, 255, 65, 0)');
+
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 24, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Core
+            ctx.fillStyle = colorWhite;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pulse Ring
+            ctx.strokeStyle = 'rgba(0, 255, 65, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+
+        function draw3() {
+            const ctx = document.getElementById('c3').getContext('2d');
+            const cx = 32, cy = 32;
+            const size = 12;
+
+            function hexagon(x, y, r) {
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (Math.PI / 3) * i;
+                    const px = x + r * Math.cos(angle);
+                    const py = y + r * Math.sin(angle);
+                    if (i === 0) ctx.moveTo(px, py);
+                    else ctx.lineTo(px, py);
+                }
+                ctx.closePath();
+            }
+
+            // Filled Hex
+            hexagon(cx, cy, size);
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.2)';
+            ctx.fill();
+            ctx.strokeStyle = colorMain;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner Dot
+            ctx.beginPath();
+            ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+            ctx.fillStyle = colorWhite;
+            ctx.fill();
+
+            // Tech lines
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy - 12);
+            ctx.moveTo(cx, cy + 20); ctx.lineTo(cx, cy + 12);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function draw4() {
+            const ctx = document.getElementById('c4').getContext('2d');
+            const size = 64;
+            const pad = 16;
+            const len = 8;
+
+            ctx.strokeStyle = colorMain;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+
+            // Top Left
+            ctx.beginPath();
+            ctx.moveTo(pad, pad + len); ctx.lineTo(pad, pad); ctx.lineTo(pad + len, pad);
+            ctx.stroke();
+
+            // Top Right
+            ctx.beginPath();
+            ctx.moveTo(size - pad, pad + len); ctx.lineTo(size - pad, pad); ctx.lineTo(size - pad - len, pad);
+            ctx.stroke();
+
+            // Bottom Left
+            ctx.beginPath();
+            ctx.moveTo(pad, size - pad - len); ctx.lineTo(pad, size - pad); ctx.lineTo(pad + len, size - pad);
+            ctx.stroke();
+
+            // Bottom Right
+            ctx.beginPath();
+            ctx.moveTo(size - pad, size - pad - len); ctx.lineTo(size - pad, size - pad); ctx.lineTo(size - pad - len, size - pad);
+            ctx.stroke();
+
+            // Center Dot
+            ctx.fillStyle = colorWhite;
+            ctx.beginPath();
+            ctx.arc(32, 32, 3, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function draw5() {
+            const ctx = document.getElementById('c5').getContext('2d');
+            const cx = 32, cy = 32;
+
+            // Diamond
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 14);
+            ctx.lineTo(cx + 14, cy);
+            ctx.lineTo(cx, cy + 14);
+            ctx.lineTo(cx - 14, cy);
+            ctx.closePath();
+
+            ctx.fillStyle = 'rgba(0, 255, 65, 0.15)';
+            ctx.fill();
+
+            ctx.strokeStyle = colorMain;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Inner Diamond
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - 6);
+            ctx.lineTo(cx + 6, cy);
+            ctx.lineTo(cx, cy + 6);
+            ctx.lineTo(cx - 6, cy);
+            ctx.closePath();
+            ctx.fillStyle = colorWhite;
+            ctx.fill();
+        }
+
+        // Render all
+        draw1();
+        draw2();
+        draw3();
+        draw4();
+        draw5();
+
+    </script>
+</body>
+
+</html>
